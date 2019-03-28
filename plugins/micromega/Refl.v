@@ -99,8 +99,6 @@ Proof.
   apply IHl; auto.
 Qed.
 
-
-
 Lemma make_conj_app : forall  A eval l1 l2, @make_conj A eval (l1 ++ l2) <-> @make_conj A eval l1 /\ @make_conj A eval l2.
 Proof.
   induction l1.
@@ -112,6 +110,23 @@ Proof.
   rewrite IHl1.
   rewrite make_conj_cons.
   tauto.
+Qed.
+
+Infix "+++" := rev_append (right associativity, at level 60) : list_scope.
+
+Lemma make_conj_rapp : forall  A eval l1 l2, @make_conj A eval (l1 +++ l2) <-> @make_conj A eval (l1++l2).
+Proof.
+  induction l1.
+  - simpl. tauto.
+  - intros.
+    simpl rev_append at 1.
+    rewrite IHl1.
+    rewrite make_conj_app.
+    rewrite make_conj_cons.
+    simpl app.
+    rewrite make_conj_cons.
+    rewrite make_conj_app.
+    tauto.
 Qed.
 
 Lemma not_make_conj_cons : forall (A:Type) (t:A) a eval  (no_middle_eval : (eval t) \/ ~ (eval  t)),

@@ -1,0 +1,77 @@
+(************************************************************************)
+(*         *   The Coq Proof Assistant / The Coq Development Team       *)
+(*  v      *   INRIA, CNRS and contributors - Copyright 1999-2019       *)
+(* <O___,, *       (see CREDITS file for the list of authors)           *)
+(*   \VV/  **************************************************************)
+(*    //   *    This file is distributed under the terms of the         *)
+(*         *     GNU Lesser General Public License Version 2.1          *)
+(*         *     (see LICENSE file for the text of the license)         *)
+(************************************************************************)
+
+{
+
+open Ltac_plugin
+open Stdarg
+open Tacarg
+open Pp
+
+let iter_hyps (tac:Tacinterp.Value.t) =
+  Proofview.Goal.enter  begin fun gl ->
+    let hyps = List.rev (Tacmach.New.pf_hyps_types gl) in
+
+    Tacticals.New.tclTHENLIST
+          (List.map (fun (h,t) -> Tacticals.New.tclTRY (Tacinterp.Value.apply tac [Tacinterp.Value.of_constr (EConstr.mkVar h) ; Tacinterp.Value.of_constr t])) hyps)
+    end
+
+let iter_specs (tac: Tacinterp.Value.t) =
+    Zify.iter_specs (fun c -> Tacinterp.Value.apply tac [Tacinterp.Value.of_constr c])
+
+}
+
+
+
+DECLARE PLUGIN "zify_plugin"
+
+
+VERNAC COMMAND EXTEND DECLAREINJECTION CLASSIFIED AS SIDEFF
+| ["Add" "InjTyp"    constr(t) ] -> { Zify.InjTable.register t }
+| ["Add" "BinOp"     constr(t) ] -> { Zify.BinOp.register t }
+| ["Add" "UnOp"      constr(t) ] -> { Zify.UnOp.register t }
+| ["Add" "CstOp"     constr(t) ] -> { Zify.CstOp.register t }
+| ["Add" "BinRel"    constr(t) ] -> { Zify.BinRel.register t }
+| ["Add" "PropOp"    constr(t) ] -> { Zify.PropOp.register t }
+| ["Add" "PropUOp"   constr(t) ] -> { Zify.PropOp.register t }
+| ["Add" "Spec"      constr(t) ] -> { Zify.Spec.register t }
+| ["Add" "BinOpSpec" constr(t) ] -> { Zify.Spec.register t }
+| ["Add" "UnOpSpec"  constr(t) ] -> { Zify.Spec.register t }
+| ["Add" "Saturate"  constr(t) ] -> { Zify.Saturate.register t }
+END
+
+TACTIC EXTEND ITER
+| [ "iter" tactic(t)      ] -> { iter_hyps t }
+| [ "iter_specs" tactic(t)] -> { iter_specs t }
+END
+
+TACTIC EXTEND TRANS
+| [ "zify_tac"  ] -> { Zify.zify_tac }
+| [ "saturate"  ] -> { Zify.saturate }
+END
+
+TACTIC EXTEND SHOW
+| [ "show_term"  ] -> {
+    Proofview.Goal.enter  begin fun gl ->
+      let concl = Tacmach.New.pf_concl gl in
+      Feedback.msg_debug (Pp.str "Term :" ++ (Termops.Internal.debug_print_constr concl)) ;
+      Tacticals.New.tclIDTAC
+      end
+  }
+END
+
+VERNAC COMMAND EXTEND ZifyPrint CLASSIFIED AS SIDEFF
+|[ "Show" "InjTyp" ] -> { Zify.print_zify_types () }
+|[ "Show" "BinOp" ]  -> { Zify.print_zify_binop () }
+|[ "Show" "UnOp" ]   -> { Zify.print_zify_unop () }
+|[ "Show" "CstOp"]   -> { Zify.print_zify_cst () }
+|[ "Show" "BinRel"]  -> { Zify.print_zify_binrel () }
+|[ "Show" "Spec"]  -> { Zify.print_zify_spec () }
+END

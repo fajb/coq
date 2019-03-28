@@ -1513,9 +1513,7 @@ Fixpoint xhyps_of_pt (base:nat) (acc : list nat) (pt:ZArithProof)  : list nat :=
 
 Definition hyps_of_pt (pt : ZArithProof) : list nat := xhyps_of_pt 0 nil pt.
 
-
 Open Scope Z_scope.
-
 
 (** To ease bindings from ml code **)
 Definition make_impl := Refl.make_impl.

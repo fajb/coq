@@ -224,26 +224,29 @@ Section S.
                  end
       end.
 
-    (*    Definition or_clause_cnf (t:clause) (f:cnf) : cnf :=
-          List.map (fun x => (t++x)) f. *)
-
-    Definition or_clause_cnf (t:clause) (f:cnf) : cnf :=
-      List.fold_right (fun e acc =>
+    Definition xor_clause_cnf (t:clause) (f:cnf) : cnf :=
+      List.fold_left (fun acc e =>
                          match or_clause t e with
                          | None => acc
                          | Some cl => cl :: acc
-                         end) nil f.
+                         end) f nil .
+
+    Definition or_clause_cnf (t: clause) (f:cnf) : cnf :=
+      match t with
+      | nil => f
+      | _   => xor_clause_cnf t f
+      end.
 
 
     Fixpoint or_cnf (f : cnf) (f' : cnf) {struct f}: cnf :=
       match f with
       | nil => cnf_tt
-      | e :: rst => (or_cnf rst f') ++ (or_clause_cnf e f')
+      | e :: rst => (or_cnf rst f') +++ (or_clause_cnf e f')
       end.
 
 
     Definition and_cnf (f1 : cnf) (f2 : cnf) : cnf :=
-      f1 ++ f2.
+      f1 +++ f2.
 
     (** TX is Prop in Coq and EConstr.constr in Ocaml.
       AF i s unit in Coq and Names.Id.t in Ocaml
@@ -260,7 +263,8 @@ Section S.
       | Cj e1 e2 =>
         (if pol then and_cnf else or_cnf) (xcnf pol e1) (xcnf pol e2)
       | D e1 e2  => (if pol then or_cnf else and_cnf) (xcnf pol e1) (xcnf pol e2)
-      | I e1 _ e2 => (if pol then or_cnf else and_cnf) (xcnf (negb pol) e1) (xcnf pol e2)
+      | I e1 _ e2
+        => (if pol then or_cnf else and_cnf) (xcnf (negb pol) e1) (xcnf pol e2)
       end.
 
     Section CNFAnnot.
@@ -269,8 +273,6 @@ Section S.
           Those need to be kept when pruning the formula.
           For efficiency, this is a separate function.
        *)
-
-
 
       Fixpoint radd_term (t : Term' * Annot) (cl : clause) : clause + list Annot :=
         match cl with
@@ -302,12 +304,18 @@ Section S.
                    end
         end.
 
-      Definition ror_clause_cnf t f :=
-        List.fold_right (fun e '(acc,tg) =>
+      Definition xror_clause_cnf t f :=
+        List.fold_left (fun '(acc,tg) e  =>
                            match ror_clause t e with
                            | inl cl => (cl :: acc,tg)
-                           | inr l => (acc,tg++l)
-                           end) (nil,nil) f .
+                           | inr l => (acc,tg+++l)
+                           end) f (nil,nil).
+
+      Definition ror_clause_cnf t f :=
+        match t with
+        | nil => (f,nil)
+        | _   => xror_clause_cnf t f
+        end.
 
 
       Fixpoint ror_cnf f f' :=
@@ -316,41 +324,252 @@ Section S.
         | e :: rst =>
           let (rst_f',t) := ror_cnf rst f' in
           let (e_f', t') := ror_clause_cnf e f' in
-          (rst_f' ++ e_f', t ++ t')
+          (rst_f' +++ e_f', t +++ t')
         end.
 
-      Fixpoint rxcnf {TX AF: Type}(polarity : bool) (f : TFormula TX AF) :=
+      Definition is_cnf_tt (c : cnf) : bool :=
+        match c with
+        | nil => true
+        | _  => false
+        end.
+
+      Definition is_cnf_ff (c : cnf) : bool :=
+        match c with
+        | nil::nil => true
+        | _        => false
+        end.
+
+      Definition is_ff_no_deps_id {AF : Type} (e : cnf) (l : list Annot) (h : list AF) :=
+        if is_cnf_ff e
+        then (* [e] has only value if it has dependencies *)
+          match l,h with
+          | nil , nil => true
+          | _   ,  _  => false
+          end
+        else false.
+
+      Definition ocons {A : Type} (o : option A) (l : list A) : list A :=
+        match o with
+        | None => l
+        | Some e => e ::l
+        end.
+
+      Fixpoint rxcnf {TX AF: Type}(polarity : bool) (f : TFormula TX AF) : cnf * list Annot * list AF:=
         match f with
-        | TT => if polarity then (cnf_tt,nil) else (cnf_ff,nil)
-        | FF  => if polarity then (cnf_ff,nil) else (cnf_tt,nil)
-        | X p => if polarity then (cnf_ff,nil) else (cnf_ff,nil)
-        | A x t  => ((if polarity then normalise x t else negate x t),nil)
+        | TT => if polarity then (cnf_tt,nil,nil) else (cnf_ff,nil,nil)
+        | FF  => if polarity then (cnf_ff,nil,nil) else (cnf_tt,nil,nil)
+        | X p => if polarity then (cnf_ff,nil,nil) else (cnf_ff,nil,nil)
+        | A x t  => ((if polarity then normalise x t else negate x t),nil,nil)
         | N e  => rxcnf (negb polarity) e
         | Cj e1 e2 =>
-          let (e1,t1) := rxcnf polarity e1 in
-          let (e2,t2) := rxcnf polarity e2 in
+          let '(e1,t1,h1) := rxcnf polarity e1 in
+          let '(e2,t2,h2) := rxcnf polarity e2 in
           if polarity
-          then  (e1 ++ e2, t1 ++ t2)
-       else let (f',t') := ror_cnf e1 e2 in
-            (f', t1 ++ t2 ++ t')
+          then  (e1 +++ e2, t1 +++ t2,h1+++h2)
+          else let (f',t') := ror_cnf e1 e2 in
+            (f', t1 +++ t2 +++ t',h1+++h2)
         | D e1 e2  =>
-          let (e1,t1) := rxcnf polarity e1 in
-          let (e2,t2) := rxcnf polarity e2 in
+          let '(e1,t1,h1) := rxcnf polarity e1 in
+          let '(e2,t2,h2) := rxcnf polarity e2 in
           if polarity
        then let (f',t') := ror_cnf e1 e2 in
-            (f', t1 ++ t2 ++ t')
-          else (e1 ++ e2, t1 ++ t2)
-        | I e1 _ e2 =>
-          let (e1 , t1) := (rxcnf (negb polarity) e1) in
-          let (e2 , t2) := (rxcnf polarity e2) in
+            (f', t1 +++ t2 +++ t',h1+++h2)
+          else (e1 +++ e2, t1 +++ t2,h1+++h2)
+        | I e1 a e2 =>
+          let '(e1 , t1, h1) := (rxcnf (negb polarity) e1) in
           if polarity
-          then let (f',t') := ror_cnf e1 e2 in
-               (f', t1 ++ t2 ++ t')
-          else (and_cnf e1 e2, t1 ++ t2)
+          then
+            if is_ff_no_deps_id e1 t1 h1
+            then (* e1 == cnf_ff and uses nothing *)
+              rxcnf polarity e2
+            else (* compute disjunction *)
+              let '(e2 , t2, h2) := (rxcnf polarity e2) in
+              let (f',t') := ror_cnf e1 e2 in
+              (f', t1 +++ t2 +++ t',ocons a (h1+++h2)) (* record the hypothesis *)
+          else
+            let '(e2 , t2, h2) := (rxcnf polarity e2) in
+            (and_cnf e1 e2, t1 +++ t2,h1+++h2)
         end.
 
       End CNFAnnot.
 
+
+      Lemma radd_term_term : forall a' a cl, radd_term a a' = inl cl -> add_term a a' = Some cl.
+      Proof.
+        induction a' ; simpl.
+        - intros.
+          destruct (deduce (fst a) (fst a)).
+          destruct (unsat t). congruence.
+          inversion H. reflexivity.
+          inversion H ;reflexivity.
+        - intros.
+          destruct (deduce (fst a0) (fst a)).
+          destruct (unsat t). congruence.
+          destruct (radd_term a0 a') eqn:RADD; try congruence.
+          inversion H. subst.
+          apply IHa' in RADD.
+          rewrite RADD.
+          reflexivity.
+          destruct (radd_term a0 a') eqn:RADD; try congruence.
+          inversion H. subst.
+          apply IHa' in RADD.
+          rewrite RADD.
+          reflexivity.
+      Qed.
+
+      Lemma radd_term_term' : forall a' a cl, add_term a a' = Some cl -> radd_term a a' = inl cl.
+      Proof.
+        induction a' ; simpl.
+        - intros.
+          destruct (deduce (fst a) (fst a)).
+          destruct (unsat t). congruence.
+          inversion H. reflexivity.
+          inversion H ;reflexivity.
+        - intros.
+          destruct (deduce (fst a0) (fst a)).
+          destruct (unsat t). congruence.
+          destruct (add_term a0 a') eqn:RADD; try congruence.
+          inversion H. subst.
+          apply IHa' in RADD.
+          rewrite RADD.
+          reflexivity.
+          destruct (add_term a0 a') eqn:RADD; try congruence.
+          inversion H. subst.
+          apply IHa' in RADD.
+          rewrite RADD.
+          reflexivity.
+      Qed.
+
+      Lemma xror_clause_clause : forall a f,
+          fst (xror_clause_cnf a f) = xor_clause_cnf a f.
+      Proof.
+        unfold xror_clause_cnf.
+        unfold xor_clause_cnf.
+        assert (ACC: fst (@nil clause,@nil Annot) = nil).
+        reflexivity.
+        intros.
+        set (F1:= (fun '(acc, tg) (e : clause) =>
+        match ror_clause a e with
+        | inl cl => (cl :: acc, tg)
+        | inr l => (acc, tg +++ l)
+        end)).
+        set (F2:= (fun (acc : list clause) (e : clause) =>
+     match or_clause a e with
+     | Some cl => cl :: acc
+     | None => acc
+     end)).
+        revert ACC.
+        generalize (@nil clause,@nil Annot).
+        generalize (@nil clause).
+        induction f ; simpl ; auto.
+        intros.
+        apply IHf.
+        unfold F1 , F2.
+        destruct p ; simpl in * ; subst.
+        clear.
+        revert a0.
+        induction a; simpl; auto.
+        intros.
+        destruct (radd_term a a1) eqn:RADD.
+        apply radd_term_term in RADD.
+        rewrite RADD.
+        auto.
+        destruct (add_term a a1) eqn:RADD'.
+        apply radd_term_term' in RADD'.
+        congruence.
+        reflexivity.
+      Qed.
+
+      Lemma ror_clause_clause : forall a f,
+          fst (ror_clause_cnf a f) = or_clause_cnf a f.
+      Proof.
+        unfold ror_clause_cnf,or_clause_cnf.
+        destruct a ; auto.
+        apply xror_clause_clause.
+      Qed.
+
+      Lemma ror_cnf_cnf : forall f1 f2, fst (ror_cnf f1 f2) = or_cnf f1 f2.
+      Proof.
+        induction f1 ; simpl ; auto.
+        intros.
+        specialize (IHf1  f2).
+        destruct(ror_cnf f1 f2).
+        rewrite <- ror_clause_clause.
+        destruct(ror_clause_cnf a f2).
+        simpl.
+        rewrite <- IHf1.
+        reflexivity.
+      Qed.
+
+      Lemma is_ff_no_deps_id_ff : forall T f d1 (d2 :list T),
+          is_ff_no_deps_id f d1 d2 = true -> f = nil::nil.
+      Proof.
+        unfold is_ff_no_deps_id.
+        intros.
+        destruct (is_cnf_ff f) eqn:FF.
+        destruct d1 ; try congruence.
+        destruct d2 ; try congruence.
+        unfold is_cnf_ff in FF.
+        destruct f ; try congruence.
+        destruct c ; try congruence.
+        destruct f ; try congruence.
+        reflexivity.
+        congruence.
+      Qed.
+
+
+      Lemma rxcnf_xcnf : forall {TX AF:Type} (f:TFormula TX AF) b,
+        fst (fst (rxcnf  b f)) = xcnf b f.
+      Proof.
+        induction f ; simpl ; auto.
+        - destruct b; simpl ; auto.
+        - destruct b; simpl ; auto.
+        - destruct b ; simpl ; auto.
+        - intros.
+          specialize (IHf1 b).
+          specialize (IHf2 b).
+          destruct (rxcnf b f1).
+          destruct (rxcnf b f2).
+          simpl in *. destruct p ; destruct p0; simpl in *.
+          subst. destruct b ; auto.
+          rewrite <- ror_cnf_cnf.
+          destruct (ror_cnf (xcnf false f1) (xcnf false f2)).
+          reflexivity.
+        - intros.
+          specialize (IHf1 b).
+          specialize (IHf2 b).
+          rewrite <- IHf1.
+          rewrite <- IHf2.
+          destruct (rxcnf b f1).
+          destruct (rxcnf b f2).
+          simpl in *.
+          simpl in *. destruct p ; destruct p0; simpl in *.
+          subst. destruct b ; auto.
+          rewrite <- ror_cnf_cnf.
+          destruct (ror_cnf (xcnf true f1) (xcnf true f2)).
+          reflexivity.
+        - intros.
+          specialize (IHf1 (negb b)).
+          specialize (IHf2 b).
+          rewrite <- IHf1.
+          rewrite <- IHf2.
+          destruct (rxcnf (negb b) f1).
+          destruct (rxcnf b f2).
+          simpl in *.
+          simpl in *. destruct p ; destruct p0; simpl in *.
+          subst.
+          destruct b;auto.
+          generalize (is_ff_no_deps_id_ff (xcnf (negb true) f1) l1 l).
+          destruct (is_ff_no_deps_id (xcnf (negb true) f1) l1 l).
+          + intros.
+            rewrite H by auto.
+            simpl. auto.
+          +
+            rewrite <- ror_cnf_cnf.
+            destruct (ror_cnf (xcnf (negb true) f1) (xcnf true f2)).
+            intros.
+            reflexivity.
+      Qed.
 
 
     Variable eval  : Env -> Term -> Prop.
@@ -378,10 +597,11 @@ Section S.
     Definition eval_cnf (env : Env) (f:cnf) := make_conj  (eval_clause  env) f.
 
 
-    Lemma eval_cnf_app : forall env x y, eval_cnf env (x++y) -> eval_cnf env x /\ eval_cnf env y.
+    Lemma eval_cnf_app : forall env x y, eval_cnf env (x+++y) -> eval_cnf env x /\ eval_cnf env y.
     Proof.
       unfold eval_cnf.
       intros.
+      rewrite make_conj_rapp in H.
       rewrite make_conj_app in H ; auto.
     Qed.
 
@@ -495,30 +715,33 @@ Section S.
     unfold eval_cnf.
     unfold or_clause_cnf.
     intros until t.
-    set (F := (fun (e : clause) (acc : list clause) =>
+    set (F := (fun (acc : list clause) (e : clause)  =>
                  match or_clause t e with
                  | Some cl => cl :: acc
                  | None => acc
                  end)).
-    induction f;auto.
-    simpl.
-    intros.
-    destruct f.
-    -  simpl in H.
-       simpl in IHf.
-       unfold F in H.
-       revert H.
-       intros.
-       apply or_clause_correct.
-       destruct (or_clause t a) ; simpl in * ; auto.
-    -
-      unfold F in H at 1.
-      revert H.
-      assert (HH := or_clause_correct t a env).
-      destruct (or_clause t a); simpl in HH ;
-        rewrite make_conj_cons in * ; intuition.
-      rewrite make_conj_cons in *.
-      tauto.
+    intro f.
+    assert (  make_conj (eval_clause env) (fold_left F f nil) -> (eval_clause env t \/ make_conj (eval_clause env) f) /\ make_conj (eval_clause env) nil).
+    {
+      generalize (@nil clause) as acc.
+      induction f.
+      - simpl.
+        intros ; tauto.
+      - intros.
+        simpl in H.
+        apply IHf in H.
+        clear IHf.
+        destruct H.
+        rewrite make_conj_cons.
+        unfold F in *; clear F.
+        generalize (or_clause_correct t a env).
+        destruct (or_clause t a).
+        rewrite make_conj_cons in H0.
+        simpl. tauto.
+        simpl. tauto.
+    }
+    destruct t ; auto.
+    tauto.
   Qed.
 
 

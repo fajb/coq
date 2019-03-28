@@ -1,5 +1,34 @@
 Require Import ZArith.
 Require Import Lia.
+
+Lemma bug_9848 : True.
+Proof.
+  do 1000 pose proof I.
+  Timeout 1 Lia.lia. (* fast *)
+Timeout 1 Qed. (* Qed is wall-clock slow but Time Qed says otherwise *)
+
+
+Axiom decompose_nat : nat -> nat -> nat.
+Axiom inleft : forall {P}, {m : nat & P m} -> nat.
+Axiom foo : nat.
+
+Lemma bug_7886 : forall (x x0 : nat)
+  (e : 0 = x0 + S x)
+  (H : decompose_nat x 0 = inleft (existT (fun m : nat => 0 = m + S x) x0 e))
+  (x1 : nat)
+  (e0 : 0 = x1 + S (S x))
+  (H1 : decompose_nat (S x) 0 = inleft (existT (fun m : nat => 0 = m + S (S x)) x1 e0)),
+    False.
+Proof.
+  intros.
+  lia.
+Qed.
+
+Lemma bug_8898 : forall (p : 0 < 0) (H: p = p), False.
+Proof.
+  intros p H. lia.
+Qed.
+
 Open Scope Z_scope.
 
 Lemma two_x_eq_1 : forall x, 2 * x = 1 -> False.

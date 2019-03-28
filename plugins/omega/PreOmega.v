@@ -213,9 +213,6 @@ Ltac zify_op_1 :=
 Ltac zify_op := repeat zify_op_1.
 
 
-
-
-
 (** II) Conversion from nat to Z *)
 
 
@@ -558,8 +555,19 @@ Ltac zify_N_op :=
 
 Ltac zify_N := repeat zify_N_rel; repeat zify_N_op; unfold Z_of_N' in *.
 
-
-
 (** The complete Z-ification tactic *)
 
-Ltac zify := repeat (zify_nat; zify_positive; zify_N); zify_op.
+Ltac zify_old := repeat (zify_nat; zify_positive; zify_N); zify_op.
+
+Require  Import ZifyClasses ZifyInst.
+Require  Zify.
+
+Ltac elim_let :=
+  repeat
+  match goal with
+  | x := ?t : Z |- _ => let h := fresh "heq_" x in pose proof (eq_refl : x = t) as h; clearbody x
+  end.
+
+Ltac zify :=
+  intros ; elim_let ;
+  Zify.zify  ; ZifyInst.saturate.
