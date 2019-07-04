@@ -255,34 +255,34 @@ obtain :math:`-1`. By Theorem :ref:`Psatz <psatz_thm>`, the goal is valid.
    + To support :g:`Z.div`, :g:`Z.modulo`, :g:`Z.quot`, and :g:`Z.rem`: ``Ltac Zify.zify_post_hook ::= Z.to_euclidean_division_equations``.
 
 
-.. cmd:: Show InjTyp
-   :name: Show InjTyp
+.. cmd:: Show Zify InjTyp
+   :name: Show Zify InjTyp
 
    This command shows the list of types that can be injected into :g:`Z`.
 
-.. cmd:: Show BinOp
-   :name: Show BinOp
+.. cmd:: Show Zify BinOp
+   :name: Show Zify BinOp
 
    This command shows the list of binary operators processed by :tacn:`zify`.
 
-.. cmd:: Show BinRel
-   :name: Show BinRel
+.. cmd:: Show Zify BinRel
+   :name: Show Zify BinRel
 
    This command shows the list of binary relations processed by :tacn:`zify`.
 
 
-.. cmd:: Show UnOp
-   :name: Show UnOp
+.. cmd:: Show Zify UnOp
+   :name: Show Zify UnOp
 
    This command shows the list of unary operators processed by :tacn:`zify`.
 
-.. cmd:: Show CstOp
-   :name: Show CstOp
+.. cmd:: Show Zify CstOp
+   :name: Show Zify CstOp
 
    This command shows the list of constants processed by :tacn:`zify`.
 
-.. cmd:: Show Spec
-   :name: Show Spec
+.. cmd:: Show Zify Spec
+   :name: Show Zify Spec
 
    This command shows the list of operators over :g:`Z` that are compiled using their specification e.g., :g:`Z.min`.
 

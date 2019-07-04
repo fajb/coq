@@ -26,7 +26,8 @@ Qed.
 
 Lemma bug_8898 : forall (p : 0 < 0) (H: p = p), False.
 Proof.
-  intros p H. lia.
+  intros p H.
+  lia.
 Qed.
 
 Open Scope Z_scope.
@@ -111,6 +112,13 @@ Proof.
   lia.
 Qed.
 
+
+
+
+
+
+
+
 Section S.
   Variables x y: Z.
   Variables XGe : x >= 0.
@@ -156,3 +164,42 @@ Proof.
   intros b q r.
   lia.
 Qed.
+
+(* From bedrock2, used to be slow *)
+Goal
+  forall
+  (x3 q r q2 r3 : Z)
+  (H : 2 ^ 2 <> 0 -> r3 + 3 = 2 ^ 2 * q + r)
+  (H0 : 0 < 2 ^ 2 -> 0 <= r < 2 ^ 2)
+  (H1 : 2 ^ 2 < 0 -> 2 ^ 2 < r <= 0)
+  (H2 : 2 ^ 2 = 0 -> q = 0)
+  (H3 : 2 ^ 2 = 0 -> r = 0)
+  (q0 r0 : Z)
+  (H4 : 4 <> 0 -> 0 = 4 * q0 + r0)
+  (H5 : 0 < 4 -> 0 <= r0 < 4)
+  (H6 : 4 < 0 -> 4 < r0 <= 0)
+  (H7 : 4 = 0 -> q0 = 0)
+  (H8 : 4 = 0 -> r0 = 0)
+  (q1 r1 : Z)
+  (H9 : 4 <> 0 -> q + q + (q + q) = 4 * q1 + r1)
+  (H10 : 0 < 4 -> 0 <= r1 < 4)
+  (H11 : 4 < 0 -> 4 < r1 <= 0)
+  (H12 : 4 = 0 -> q1 = 0)
+  (H13 : 4 = 0 -> r1 = 0)
+  (r2 : Z)
+  (H14 : 2 ^ 16 <> 0 ->  x3 = 2 ^ 16 * q2 + r2)
+  (H15 : 0 < 2 ^ 16 -> 0 <= r2 < 2 ^ 16)
+  (H16 : 2 ^ 16 < 0 -> 2 ^ 16 < r2 <= 0)
+  (H17 : 2 ^ 16 = 0 -> q2 = 0)
+  (H18 : 2 ^ 16 = 0 -> r2 = 0)
+  (q3 : Z)
+  (H19 : 16383 + 1 <> 0 -> q2 = (16383 + 1) * q3 + r3)
+  (H20 : 0 < 16383 + 1 -> 0 <= r3 < 16383 + 1)
+  (H21 : 16383 + 1 < 0 -> 16383 + 1 < r3 <= 0)
+  (H22 : 16383 + 1 = 0 -> q3 = 0)
+  (H23 : 16383 + 1 = 0 -> r3 = 0),
+  r0 = r1.
+Proof.
+  intros.
+  Timeout 1 lia.
+Timeout 1 Qed.

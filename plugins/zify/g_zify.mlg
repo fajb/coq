@@ -48,7 +48,6 @@ VERNAC COMMAND EXTEND DECLAREINJECTION CLASSIFIED AS SIDEFF
 END
 
 TACTIC EXTEND ITER
-| [ "iter" tactic(t)      ] -> { iter_hyps t }
 | [ "iter_specs" tactic(t)] -> { iter_specs t }
 END
 
@@ -68,10 +67,10 @@ TACTIC EXTEND SHOW
 END
 
 VERNAC COMMAND EXTEND ZifyPrint CLASSIFIED AS SIDEFF
-|[ "Show" "InjTyp" ] -> { Zify.print_zify_types () }
-|[ "Show" "BinOp" ]  -> { Zify.print_zify_binop () }
-|[ "Show" "UnOp" ]   -> { Zify.print_zify_unop () }
-|[ "Show" "CstOp"]   -> { Zify.print_zify_cst () }
-|[ "Show" "BinRel"]  -> { Zify.print_zify_binrel () }
-|[ "Show" "Spec"]  -> { Zify.print_zify_spec () }
+|[ "Show" "Zify" "InjTyp" ] -> { Zify.print_zify_types () }
+|[ "Show" "Zify" "BinOp" ]  -> { Zify.print_zify_binop () }
+|[ "Show" "Zify" "UnOp" ]   -> { Zify.print_zify_unop () }
+|[ "Show" "Zify" "CstOp"]   -> { Zify.print_zify_cst () }
+|[ "Show" "Zify" "BinRel"]  -> { Zify.print_zify_binrel () }
+|[ "Show" "Zify" "Spec"]  -> { Zify.print_zify_spec () }
 END

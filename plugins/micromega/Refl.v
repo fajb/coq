@@ -130,33 +130,23 @@ Proof.
 Qed.
 
 Lemma not_make_conj_cons : forall (A:Type) (t:A) a eval  (no_middle_eval : (eval t) \/ ~ (eval  t)),
-  ~ make_conj  eval (t ::a) -> ~  (eval t) \/ (~ make_conj  eval a).
+  ~ make_conj  eval (t ::a) <-> ~  (eval t) \/ (~ make_conj  eval a).
 Proof.
   intros.
-  simpl in H.
-  destruct a.
-  tauto.
+  rewrite make_conj_cons.
   tauto.
 Qed.
 
 Lemma not_make_conj_app : forall (A:Type) (t:list A) a eval
   (no_middle_eval : forall d, eval d \/ ~ eval d) ,
-  ~ make_conj  eval (t ++ a) -> (~ make_conj  eval t) \/ (~ make_conj eval a).
+  ~ make_conj  eval (t ++ a) <-> (~ make_conj  eval t) \/ (~ make_conj eval a).
 Proof.
   induction t.
-  simpl.
-  tauto.
-  intros.
-  simpl ((a::t)++a0)in H.
-  destruct (@not_make_conj_cons _ _ _ _  (no_middle_eval a) H).
-  left ; red ; intros.
-  apply H0.
-  rewrite  make_conj_cons in H1.
-  tauto.
-  destruct (IHt _ _ no_middle_eval H0).
-  left ; red ; intros.
-  apply H1.
-  rewrite make_conj_cons in H2.
-  tauto.
-  right ; auto.
+  - simpl.
+    tauto.
+  - intros.
+    simpl ((a::t)++a0).
+    rewrite !not_make_conj_cons by auto.
+    rewrite IHt by auto.
+    tauto.
 Qed.

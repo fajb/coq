@@ -13,7 +13,7 @@ Open Scope Z_scope.
 (* Instances of [ZifyClasses] for dealing with boolean operators.
    Various encodings of boolean are possible.  One objective is to
    have an encoding that is terse but also lia friendly.
-*)
+ *)
 
 (** [Z_of_bool] is the injection function for boolean *)
 Definition Z_of_bool (b : bool) : Z := if b then 1 else 0.
@@ -26,49 +26,35 @@ Proof.
   destruct x ; simpl; compute; intuition congruence.
 Qed.
 
-Program Instance Inj_bool_Z : InjTyp bool Z :=
-  {| inj := Z_of_bool ; pred :=(fun x => 0 <= x <= 1) |}.
-Next Obligation.
-  apply Z_of_bool_bound.
-Qed.
+Instance Inj_bool_Z : InjTyp bool Z :=
+  { inj := Z_of_bool ; pred :=(fun x => 0 <= x <= 1) ; cstr := Z_of_bool_bound}.
 Add InjTyp Inj_bool_Z.
-
 
 (** Boolean operators *)
 
-Program Instance Op_andb : BinOp andb :=
-  {| TBOp := Z.min |}. (* Other encodings are possible *)
-Next Obligation.
-  destruct n,m; simpl; auto.
-Qed.
+Instance Op_andb : BinOp andb :=
+  { TBOp := Z.min ;
+    TBOpInj := ltac: (destruct n,m; reflexivity)}.
 Add BinOp Op_andb.
 
-Program Instance Op_orb : BinOp orb :=
-  {| TBOp := Z.max |}.
-Next Obligation.
-  destruct n,m; simpl; auto.
-Qed.
+Instance Op_orb : BinOp orb :=
+  { TBOp := Z.max ;
+    TBOpInj := ltac:(destruct n,m; reflexivity)}.
 Add BinOp Op_orb.
 
-Program Instance Op_negb : UnOp negb :=
-  {| TUOp := fun x => 1 - x |}.
-Next Obligation.
-  destruct x; simpl; auto.
-Qed.
+Instance Op_negb : UnOp negb :=
+  { TUOp := fun x => 1 - x ; TUOpInj := ltac:(destruct x; reflexivity)}.
 Add UnOp Op_negb.
 
-Program Instance Op_eq_bool : BinRel (@eq bool) :=
-  {| TR := @eq Z |}.
-Next Obligation.
-  destruct n,m ; simpl;intuition congruence.
-Qed.
+Instance Op_eq_bool : BinRel (@eq bool) :=
+  {TR := @eq Z ; TRInj := ltac:(destruct n,m; simpl ; intuition congruence) }.
 Add BinRel Op_eq_bool.
 
-Program Instance Op_true : CstOp true :=
-  {| TCst := 1 |}.
+Instance Op_true : CstOp true :=
+  { TCst := 1 ; TCstInj := eq_refl }.
 
-Program Instance Op_false : CstOp false :=
-  {| TCst := 0 |}.
+Instance Op_false : CstOp false :=
+  { TCst := 0 ; TCstInj := eq_refl }.
 
 
 (** Comparisons are encoded using the predicates [isZero] and [isLeZero].*)
@@ -130,58 +116,53 @@ Qed.
 
 (** Comparison over Z *)
 
-Program Instance Op_Zeqb : BinOp Z.eqb :=
-  {| TBOp := fun x y => isZero (Z.sub x y) |}.
-Next Obligation.
-  apply Z_eqb_isZero.
-Qed.
+Instance Op_Zeqb : BinOp Z.eqb :=
+  { TBOp := fun x y => isZero (Z.sub x y) ; TBOpInj := Z_eqb_isZero}.
 
-Program Instance Op_Zleb : BinOp Z.leb :=
-  {| TBOp := fun x y => isLeZero (x-y) |}.
-Next Obligation.
-  unfold isLeZero.
-  rewrite Z_leb_sub.
-  auto.
-Qed.
+Instance Op_Zleb : BinOp Z.leb :=
+  { TBOp := fun x y => isLeZero (x-y) ;
+    TBOpInj :=
+      ltac: (intros;unfold isLeZero;
+               rewrite Z_leb_sub;
+               auto) }.
 Add BinOp Op_Zleb.
 
-Program Instance Op_Zgeb : BinOp Z.geb :=
-  {| TBOp := fun x y => isLeZero (y-x) |}.
-Next Obligation.
-  unfold isLeZero.
-  rewrite Z.geb_leb.
-  rewrite Z_leb_sub.
-  auto.
-Qed.
+Instance Op_Zgeb : BinOp Z.geb :=
+  { TBOp := fun x y => isLeZero (y-x) ;
+    TBOpInj := ltac:(
+                 intros;
+                   unfold isLeZero;
+                   rewrite Z.geb_leb;
+                   rewrite Z_leb_sub;
+                   auto) }.
 Add BinOp Op_Zgeb.
 
-Program Instance Op_Zltb : BinOp Z.ltb :=
-  {| TBOp := fun x y => isLeZero (x+1-y) |}.
-Next Obligation.
-  unfold isLeZero.
-  rewrite Z_ltb_leb.
-  rewrite <- Z_leb_sub.
-  reflexivity.
-Qed.
-Add BinOp Op_Zltb.
+Instance Op_Zltb : BinOp Z.ltb :=
+  { TBOp := fun x y => isLeZero (x+1-y) ;
+    TBOpInj := ltac:(
+                 intros;
+                   unfold isLeZero;
+                   rewrite Z_ltb_leb;
+                   rewrite <- Z_leb_sub;
+                   reflexivity) }.
 
-Program Instance Op_Zgtb : BinOp Z.gtb :=
-  {| TBOp := fun x y => isLeZero (y-x+1) |}.
-Next Obligation.
-  unfold isLeZero.
-  rewrite Z.gtb_ltb.
-  rewrite Z_ltb_leb.
-  rewrite Z_leb_sub.
-  rewrite Z.add_sub_swap.
-  reflexivity.
-Qed.
+Instance Op_Zgtb : BinOp Z.gtb :=
+  { TBOp := fun x y => isLeZero (y-x+1) ;
+    TBOpInj := ltac:(
+                 intros;
+                   unfold isLeZero;
+                   rewrite Z.gtb_ltb;
+                   rewrite Z_ltb_leb;
+                   rewrite Z_leb_sub;
+                   rewrite Z.add_sub_swap;
+                   reflexivity) }.
 Add BinOp Op_Zgtb.
 
 (** Comparison over nat *)
 
 
 Lemma Z_of_nat_eqb_iff : forall n m,
-  (n =? m)%nat = (Z.of_nat n =? Z.of_nat m).
+    (n =? m)%nat = (Z.of_nat n =? Z.of_nat m).
 Proof.
   intros.
   rewrite Nat.eqb_compare.
@@ -191,7 +172,7 @@ Proof.
 Qed.
 
 Lemma Z_of_nat_leb_iff : forall n m,
-  (n <=? m)%nat = (Z.of_nat n <=? Z.of_nat m).
+    (n <=? m)%nat = (Z.of_nat n <=? Z.of_nat m).
 Proof.
   intros.
   rewrite Nat.leb_compare.
@@ -201,7 +182,7 @@ Proof.
 Qed.
 
 Lemma Z_of_nat_ltb_iff : forall n m,
-  (n <? m)%nat = (Z.of_nat n <? Z.of_nat m).
+    (n <? m)%nat = (Z.of_nat n <? Z.of_nat m).
 Proof.
   intros.
   rewrite Nat.ltb_compare.
@@ -210,34 +191,33 @@ Proof.
   reflexivity.
 Qed.
 
-
-Program Instance Op_nat_eqb : BinOp Nat.eqb :=
-  {| TBOp := fun x y => isZero (Z.sub x y) |}.
-Next Obligation.
-  rewrite  <- Z_eqb_isZero.
-  f_equal. apply Z_of_nat_eqb_iff.
-Qed.
+Instance Op_nat_eqb : BinOp Nat.eqb :=
+   { TBOp := fun x y => isZero (Z.sub x y) ;
+     TBOpInj := ltac:(
+                  intros; simpl;
+                    rewrite  <- Z_eqb_isZero;
+                  f_equal; apply Z_of_nat_eqb_iff) }.
 Add BinOp Op_nat_eqb.
 
-Program Instance Op_nat_leb : BinOp Nat.leb :=
-  {| TBOp := fun x y => isLeZero (x-y) |}.
-Next Obligation.
-  rewrite Z_of_nat_leb_iff.
-  unfold isLeZero.
-  rewrite Z_leb_sub.
-  auto.
-Qed.
+Instance Op_nat_leb : BinOp Nat.leb :=
+  { TBOp := fun x y => isLeZero (x-y) ;
+    TBOpInj := ltac:(
+                 intros;
+                 rewrite Z_of_nat_leb_iff;
+                 unfold isLeZero;
+                 rewrite Z_leb_sub;
+                 auto) }.
 Add BinOp Op_nat_leb.
 
-Program Instance Op_nat_ltb : BinOp Nat.ltb :=
-  {| TBOp := fun x y => isLeZero (x+1-y) |}.
-Next Obligation.
-  rewrite Z_of_nat_ltb_iff.
-  unfold isLeZero.
-  rewrite Z_ltb_leb.
-  rewrite <- Z_leb_sub.
-  reflexivity.
-Qed.
+Instance Op_nat_ltb : BinOp Nat.ltb :=
+  { TBOp := fun x y => isLeZero (x+1-y) ;
+     TBOpInj := ltac:(
+                  intros;
+                  rewrite Z_of_nat_ltb_iff;
+                    unfold isLeZero;
+                    rewrite Z_ltb_leb;
+                    rewrite <- Z_leb_sub;
+                    reflexivity) }.
 Add BinOp Op_nat_ltb.
 
 (** Injected boolean operators *)
@@ -253,7 +233,7 @@ Proof.
     simpl. auto.
 Qed.
 
-Program Instance Z_eqb_ZSpec : UnOpSpec isZero :=
+Instance Z_eqb_ZSpec : UnOpSpec isZero :=
   {| UPred := fun n r => n <> r ; USpec := Z_eqb_ZSpec_ok |}.
 Add Spec Z_eqb_ZSpec.
 

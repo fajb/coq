@@ -69,73 +69,69 @@ Add InjTyp Inj_nat_Z.
 
 (* zify_nat_rel *)
 Instance Op_ge : BinRel ge :=
-{| TR := Z.ge; TRInj := Nat2Z.inj_ge |}.
+  {| TR := Z.ge; TRInj := Nat2Z.inj_ge |}.
 Add BinRel Op_ge.
 
 Instance Op_lt : BinRel lt :=
-{| TR := Z.lt; TRInj := Nat2Z.inj_lt |}.
+  {| TR := Z.lt; TRInj := Nat2Z.inj_lt |}.
 Add BinRel Op_lt.
 
 Instance Op_gt : BinRel gt :=
-{| TR := Z.gt; TRInj := Nat2Z.inj_gt |}.
+  {| TR := Z.gt; TRInj := Nat2Z.inj_gt |}.
 Add BinRel Op_gt.
 
 Instance Op_le : BinRel le :=
-{| TR := Z.le; TRInj := Nat2Z.inj_le |}.
+  {| TR := Z.le; TRInj := Nat2Z.inj_le |}.
 Add BinRel Op_le.
 
 Instance Op_eq_nat : BinRel (@eq nat) :=
-{| TR := @eq Z ; TRInj := fun x y : nat => iff_sym (Nat2Z.inj_iff x y) |}.
+  {| TR := @eq Z ; TRInj := fun x y : nat => iff_sym (Nat2Z.inj_iff x y) |}.
 Add BinRel Op_eq_nat.
 
 (* zify_nat_op *)
 Instance Op_plus : BinOp Nat.add :=
-{| TBOp := Z.add; TBOpInj := Nat2Z.inj_add |}.
+  {| TBOp := Z.add; TBOpInj := Nat2Z.inj_add |}.
 Add BinOp Op_plus.
 
 Instance Op_sub : BinOp Nat.sub :=
-{| TBOp := fun n m => Z.max 0 (n - m) ; TBOpInj := Nat2Z.inj_sub_max |}.
+  {| TBOp := fun n m => Z.max 0 (n - m) ; TBOpInj := Nat2Z.inj_sub_max |}.
 Add BinOp Op_sub.
 
 Instance Op_mul : BinOp Nat.mul :=
-{| TBOp := Z.mul ; TBOpInj := Nat2Z.inj_mul |}.
+  {| TBOp := Z.mul ; TBOpInj := Nat2Z.inj_mul |}.
 Add BinOp Op_mul.
 
 Instance Op_min : BinOp Nat.min :=
-{| TBOp := Z.min ; TBOpInj := Nat2Z.inj_min |}.
+  {| TBOp := Z.min ; TBOpInj := Nat2Z.inj_min |}.
 Add BinOp Op_min.
 
 Instance Op_max : BinOp Nat.max :=
-{| TBOp := Z.max ; TBOpInj := Nat2Z.inj_max |}.
+  {| TBOp := Z.max ; TBOpInj := Nat2Z.inj_max |}.
 Add BinOp Op_max.
 
-Program Instance Op_pred : UnOp Nat.pred :=
-{| TUOp := fun n => Z.max 0 (n - 1) ; TUOpInj := Nat2Z.inj_pred_max |}.
+Instance Op_pred : UnOp Nat.pred :=
+  {| TUOp := fun n => Z.max 0 (n - 1) ; TUOpInj := Nat2Z.inj_pred_max |}.
 Add UnOp Op_pred.
 
 Instance Op_S : UnOp S :=
-{| TUOp := fun x => Z.add x 1 ; TUOpInj := Nat2Z.inj_succ |}.
+  {| TUOp := fun x => Z.add x 1 ; TUOpInj := Nat2Z.inj_succ |}.
 Add UnOp Op_S.
 
-Program Instance Op_O : CstOp O :=
-  {| TCst := Z0 |}.
-Add CstOp Op_O.
+Instance Op_O : CstOp O :=
+  {| TCst := Z0 ; TCstInj := eq_refl (Z.of_nat 0) |}.
 
-Program Instance Op_Z_abs_nat : UnOp Z.abs_nat :=
-{| TUOp := Z.abs  ; TUOpInj := Zabs2Nat.id_abs |}.
+Instance Op_Z_abs_nat : UnOp  Z.abs_nat :=
+  { TUOp := Z.abs ; TUOpInj := Zabs2Nat.id_abs }.
 Add UnOp Op_Z_abs_nat.
 
 (** Support for positive *)
 
 Instance Inj_pos_Z : InjTyp positive Z :=
-  mkinj _ _ Zpos (fun x =>  0 < x ) Pos2Z.pos_is_pos.
+  {| inj := Zpos ; pred := (fun x =>  0 < x ) ; cstr := Pos2Z.pos_is_pos |}.
 Add InjTyp Inj_pos_Z.
 
-Instance Op_pos_to_nat : UnOp  Pos.to_nat.
-Proof.
-  apply mkuop with (TUOp := (fun x => x)) .
-  apply positive_nat_Z.
-Defined.
+Instance Op_pos_to_nat : UnOp  Pos.to_nat :=
+  {TUOp := (fun x => x); TUOpInj := positive_nat_Z}.
 Add UnOp Op_pos_to_nat.
 
 Instance Inj_N_Z : InjTyp N Z :=
@@ -143,262 +139,254 @@ Instance Inj_N_Z : InjTyp N Z :=
 Add InjTyp Inj_N_Z.
 
 
-Instance Op_N_to_nat : UnOp  N.to_nat.
-Proof.
-  apply mkuop with (TUOp := (fun x => x)) .
-  apply N_nat_Z.
-Defined.
+Instance Op_N_to_nat : UnOp  N.to_nat :=
+  { TUOp := fun x => x ; TUOpInj := N_nat_Z }.
 Add UnOp Op_N_to_nat.
 
 (* zify_positive_rel *)
 
 Instance Op_pos_ge : BinRel Pos.ge :=
-{| TR := Z.ge; TRInj := fun x y => iff_refl (Z.pos x >= Z.pos y) |}.
+  {| TR := Z.ge; TRInj := fun x y => iff_refl (Z.pos x >= Z.pos y) |}.
 Add BinRel Op_pos_ge.
 
 Instance Op_pos_lt : BinRel Pos.lt :=
-{| TR := Z.lt; TRInj := fun x y => iff_refl (Z.pos x < Z.pos y) |}.
+  {| TR := Z.lt; TRInj := fun x y => iff_refl (Z.pos x < Z.pos y) |}.
 Add BinRel Op_pos_lt.
 
 Instance Op_pos_gt : BinRel Pos.gt :=
-{| TR := Z.gt; TRInj := fun x y => iff_refl (Z.pos x > Z.pos y)  |}.
+  {| TR := Z.gt; TRInj := fun x y => iff_refl (Z.pos x > Z.pos y)  |}.
 Add BinRel Op_pos_gt.
 
 Instance Op_pos_le : BinRel Pos.le :=
-{| TR := Z.le; TRInj := fun x y => iff_refl (Z.pos x <= Z.pos y) |}.
+  {| TR := Z.le; TRInj := fun x y => iff_refl (Z.pos x <= Z.pos y) |}.
 Add BinRel Op_pos_le.
 
 Instance Op_eq_pos : BinRel (@eq positive) :=
-{| TR := @eq Z ; TRInj := fun x y  => iff_sym (Pos2Z.inj_iff x y) |}.
+  {| TR := @eq Z ; TRInj := fun x y  => iff_sym (Pos2Z.inj_iff x y) |}.
 Add BinRel Op_eq_pos.
 
 (* zify_positive_op *)
 
 
 Program Instance Op_Z_of_N : UnOp Z.of_N :=
-  {| TUOp := (fun x => x) |}.
+  { TUOp := (fun x => x) ; TUOpInj := fun x => eq_refl (Z.of_N x) }.
 Add UnOp Op_Z_of_N.
 
-Program Instance Op_Z_neg : UnOp Z.neg :=
-  {| TUOp :=  Z.opp |}.
+Instance Op_Z_neg : UnOp Z.neg :=
+  { TUOp :=  Z.opp ; TUOpInj := (fun x => eq_refl (Zneg x))}.
 Add UnOp Op_Z_neg.
 
-Program Instance Op_Z_pos : UnOp Z.pos :=
-  {| TUOp := (fun x =>  x) |}.
+Instance Op_Z_pos : UnOp Z.pos :=
+  { TUOp := (fun x =>  x) ; TUOpInj := (fun x => eq_refl (Z.pos x))}.
 Add UnOp Op_Z_pos.
 
-Program Instance Op_pos_succ : UnOp Pos.succ :=
-  {| TUOp := fun x => x + 1; TUOpInj := Pos2Z.inj_succ  |}.
+Instance Op_pos_succ : UnOp Pos.succ :=
+  { TUOp := fun x => x + 1; TUOpInj := Pos2Z.inj_succ  }.
 Add UnOp Op_pos_succ.
 
-Program Instance Op_pos_pred : UnOp Pos.pred :=
-  {| TUOp := fun x => Z.max 1 (x - 1)   |}.
-Next Obligation.
-  intros.
-  rewrite <- Pos.sub_1_r.
-  apply Pos2Z.inj_sub_max.
-Defined.
+Instance Op_pos_pred : UnOp Pos.pred :=
+  { TUOp := fun x => Z.max 1 (x - 1) ;
+    TUOpInj := ltac :
+                 (intros;
+                    rewrite <- Pos.sub_1_r;
+                    apply Pos2Z.inj_sub_max) }.
 Add UnOp Op_pos_pred.
 
-Program Instance Op_pos_of_succ_nat : UnOp Pos.of_succ_nat :=
-  {|TUOp := fun x => x + 1 ; TUOpInj := Zpos_P_of_succ_nat |}.
+Instance Op_pos_of_succ_nat : UnOp Pos.of_succ_nat :=
+  { TUOp := fun x => x + 1 ; TUOpInj := Zpos_P_of_succ_nat }.
 Add UnOp Op_pos_of_succ_nat.
 
 Program Instance Op_pos_add : BinOp Pos.add :=
-  {| TBOp := Z.add |}.
+  { TBOp := Z.add ; TBOpInj := ltac: (reflexivity) }.
 Add BinOp Op_pos_add.
 
-Program Instance Op_pos_sub : BinOp Pos.sub :=
-  {| TBOp := fun n m => Z.max 1 (n - m) ;TBOpInj := Pos2Z.inj_sub_max |}.
+Instance Op_pos_sub : BinOp Pos.sub :=
+  { TBOp := fun n m => Z.max 1 (n - m) ;TBOpInj := Pos2Z.inj_sub_max }.
 Add BinOp Op_pos_sub.
 
-Program Instance Op_pos_mul : BinOp Pos.mul :=
-  {| TBOp :=  Z.mul |}.
+Instance Op_pos_mul : BinOp Pos.mul :=
+  { TBOp :=  Z.mul ; TBOpInj := ltac: (reflexivity) }.
 Add BinOp Op_pos_mul.
 
-Program Instance Op_pos_min : BinOp Pos.min :=
-  {| TBOp := Z.min ; TBOpInj := Pos2Z.inj_min|}.
+Instance Op_pos_min : BinOp Pos.min :=
+  { TBOp := Z.min ; TBOpInj := Pos2Z.inj_min }.
 Add BinOp Op_pos_min.
 
-Program Instance Op_pos_max : BinOp Pos.max :=
-  {| TBOp := Z.max ; TBOpInj := Pos2Z.inj_max |}.
+Instance Op_pos_max : BinOp Pos.max :=
+  { TBOp := Z.max ; TBOpInj := Pos2Z.inj_max }.
 Add BinOp Op_pos_max.
 
-Program Instance Op_xO : UnOp xO :=
-  {| TUOp := fun x => 2 * x |}.
+Instance Op_xO : UnOp xO :=
+  { TUOp := fun x => 2 * x ; TUOpInj := ltac: (reflexivity) }.
 Add UnOp Op_xO.
 
-Program Instance Op_xI : UnOp xI :=
-  {| TUOp := fun x => 2 * x + 1|}.
+Instance Op_xI : UnOp xI :=
+  { TUOp := fun x => 2 * x + 1 ; TUOpInj := ltac: (reflexivity) }.
 Add UnOp Op_xI.
 
-Program Instance Op_xH : CstOp xH :=
-  {| TCst := 1%Z|}.
+Instance Op_xH : CstOp xH :=
+  { TCst := 1%Z ; TCstInj := ltac:(reflexivity)}.
 Add CstOp Op_xH.
 
-Program Instance Op_Z_of_nat : UnOp Z.of_nat:=
-  {| TUOp := fun x => x |}.
+Instance Op_Z_of_nat : UnOp Z.of_nat:=
+  { TUOp := fun x => x ; TUOpInj := ltac:(reflexivity) }.
 Add UnOp Op_Z_of_nat.
 
 (* zify_N_rel *)
-Program Instance Op_N_ge : BinRel N.ge :=
-{| TR := Z.ge ; TRInj := N2Z.inj_ge |}.
+Instance Op_N_ge : BinRel N.ge :=
+  {| TR := Z.ge ; TRInj := N2Z.inj_ge |}.
 Add BinRel Op_N_ge.
 
-Program Instance Op_N_lt : BinRel N.lt :=
+Instance Op_N_lt : BinRel N.lt :=
   {| TR := Z.lt ; TRInj := N2Z.inj_lt |}.
 Add BinRel Op_N_lt.
 
-Program Instance Op_N_gt : BinRel N.gt :=
-{| TR := Z.gt ; TRInj := N2Z.inj_gt |}.
+Instance Op_N_gt : BinRel N.gt :=
+  {| TR := Z.gt ; TRInj := N2Z.inj_gt |}.
 Add BinRel Op_N_gt.
 
-Program Instance Op_N_le : BinRel N.le :=
-{| TR := Z.le ; TRInj := N2Z.inj_le |}.
+Instance Op_N_le : BinRel N.le :=
+  {| TR := Z.le ; TRInj := N2Z.inj_le |}.
 Add BinRel Op_N_le.
 
 Instance Op_eq_N : BinRel (@eq N) :=
-{| TR := @eq Z ; TRInj := fun x y : N => iff_sym (N2Z.inj_iff x y) |}.
+  {| TR := @eq Z ; TRInj := fun x y : N => iff_sym (N2Z.inj_iff x y) |}.
 Add BinRel Op_eq_N.
 
 (* zify_N_op *)
-Program Instance Op_N_of_nat : UnOp  N.of_nat :=
-  {| TUOp := fun x => x ; TUOpInj := nat_N_Z |}.
+Instance Op_N_of_nat : UnOp  N.of_nat :=
+  { TUOp := fun x => x ; TUOpInj := nat_N_Z }.
 Add UnOp Op_N_of_nat.
 
-Program Instance Op_Z_abs_N : UnOp Z.abs_N :=
-  {| TUOp := Z.abs ; TUOpInj := N2Z.inj_abs_N |}.
+Instance Op_Z_abs_N : UnOp Z.abs_N :=
+  { TUOp := Z.abs ; TUOpInj := N2Z.inj_abs_N }.
 Add UnOp Op_Z_abs_N.
 
-Program Instance Op_N_pos : UnOp N.pos :=
-  {| TUOp := fun x => x |}.
+Instance Op_N_pos : UnOp N.pos :=
+  { TUOp := fun x => x ; TUOpInj := ltac:(reflexivity)}.
 Add UnOp Op_N_pos.
 
-Program Instance Op_N_add : BinOp N.add :=
+Instance Op_N_add : BinOp N.add :=
   {| TBOp := Z.add ; TBOpInj := N2Z.inj_add |}.
 Add BinOp Op_N_add.
 
-Program Instance Op_N_min : BinOp N.min :=
+Instance Op_N_min : BinOp N.min :=
   {| TBOp := Z.min ; TBOpInj := N2Z.inj_min |}.
 Add BinOp Op_N_min.
 
-Program Instance Op_N_max : BinOp N.max :=
+Instance Op_N_max : BinOp N.max :=
   {| TBOp := Z.max ; TBOpInj := N2Z.inj_max |}.
 Add BinOp Op_N_max.
 
-Program Instance Op_N_mul : BinOp N.mul :=
+Instance Op_N_mul : BinOp N.mul :=
   {| TBOp := Z.mul ; TBOpInj := N2Z.inj_mul |}.
 Add BinOp Op_N_mul.
 
-Program Instance Op_N_sub : BinOp N.sub :=
+Instance Op_N_sub : BinOp N.sub :=
   {| TBOp := fun x y => Z.max 0 (x - y) ; TBOpInj := N2Z.inj_sub_max|}.
 Add BinOp Op_N_sub.
 
-Program Instance Op_N_div : BinOp N.div :=
+Instance Op_N_div : BinOp N.div :=
   {| TBOp := Z.div ; TBOpInj := N2Z.inj_div|}.
 Add BinOp Op_N_div.
 
 
 
-Program Instance Op_N_mod : BinOp N.modulo :=
+Instance Op_N_mod : BinOp N.modulo :=
   {| TBOp := Z.rem ; TBOpInj := N2Z.inj_rem|}.
 Add BinOp Op_N_mod.
 
-Program Instance Op_N_pred : UnOp N.pred :=
-  {| TUOp := fun x  => Z.max 0 (x - 1)|}.
-Next Obligation. intros.
-rewrite N.pred_sub.
-apply N2Z.inj_sub_max.
-Defined.
+Instance Op_N_pred : UnOp N.pred :=
+  { TUOp := fun x  => Z.max 0 (x - 1) ;
+    TUOpInj :=
+      ltac:(intros; rewrite N.pred_sub; apply N2Z.inj_sub_max) }.
 Add UnOp Op_N_pred.
 
-Program Instance Op_N_succ : UnOp N.succ :=
+Instance Op_N_succ : UnOp N.succ :=
   {| TUOp := fun x => x + 1 ; TUOpInj := N2Z.inj_succ |}.
 Add UnOp Op_N_succ.
 
 (** Support for Z - injected to itself *)
 
 (* zify_Z_rel *)
-Program Instance Op_Z_ge : BinRel Z.ge :=
-{| TR := Z.ge ; TRInj := fun x y  => iff_refl (x>= y)|}.
+Instance Op_Z_ge : BinRel Z.ge :=
+  {| TR := Z.ge ; TRInj := fun x y  => iff_refl (x>= y)|}.
 Add BinRel Op_Z_ge.
 
 Instance Op_Z_lt : BinRel Z.lt :=
-{| TR := Z.lt ;  TRInj := fun x y  => iff_refl (x < y)|}.
+  {| TR := Z.lt ;  TRInj := fun x y  => iff_refl (x < y)|}.
 Add BinRel Op_Z_lt.
 
 Instance Op_Z_gt : BinRel Z.gt :=
-{| TR := Z.gt ;TRInj := fun x y  => iff_refl (x > y)|}.
+  {| TR := Z.gt ;TRInj := fun x y  => iff_refl (x > y)|}.
 Add BinRel Op_Z_gt.
 
 Instance Op_Z_le : BinRel Z.le :=
-{| TR := Z.le ;TRInj := fun x y  => iff_refl (x <= y)|}.
+  {| TR := Z.le ;TRInj := fun x y  => iff_refl (x <= y)|}.
 Add BinRel Op_Z_le.
 
-Program Instance Op_eqZ : BinRel (@eq Z) :=
-{| TR := @eq Z ; TRInj := fun x y  => iff_refl (x = y)|}.
+Instance Op_eqZ : BinRel (@eq Z) :=
+  { TR := @eq Z ; TRInj := fun x y  => iff_refl (x = y) }.
 Add BinRel Op_eqZ.
 
-Program Instance Op_Z_add : BinOp Z.add :=
-  {| TBOp := Z.add |}.
+Instance Op_Z_add : BinOp Z.add :=
+  { TBOp := Z.add  ; TBOpInj := ltac:(reflexivity) }.
 Add BinOp Op_Z_add.
 
-Program Instance Op_Z_min : BinOp Z.min :=
-  {| TBOp := Z.min |}.
+Instance Op_Z_min : BinOp Z.min :=
+  { TBOp := Z.min ; TBOpInj := ltac:(reflexivity) }.
 Add BinOp Op_Z_min.
 
-Program Instance Op_Z_max : BinOp Z.max :=
-  {| TBOp := Z.max |}.
+Instance Op_Z_max : BinOp Z.max :=
+  { TBOp := Z.max ; TBOpInj := ltac:(reflexivity) }.
 Add BinOp Op_Z_max.
 
-Program Instance Op_Z_mul : BinOp Z.mul :=
-  {| TBOp := Z.mul |}.
+Instance Op_Z_mul : BinOp Z.mul :=
+  { TBOp := Z.mul ; TBOpInj := ltac:(reflexivity) }.
 Add BinOp Op_Z_mul.
 
-Program Instance Op_Z_sub : BinOp Z.sub :=
-  {| TBOp := Z.sub |}.
+Instance Op_Z_sub : BinOp Z.sub :=
+  { TBOp := Z.sub ; TBOpInj := ltac:(reflexivity) }.
 Add BinOp Op_Z_sub.
 
-Program Instance Op_Z_div : BinOp Z.div :=
-  {| TBOp := Z.div |}.
+Instance Op_Z_div : BinOp Z.div :=
+  { TBOp := Z.div ; TBOpInj := ltac:(reflexivity) }.
 Add BinOp Op_Z_div.
 
-Program Instance Op_Z_mod : BinOp Z.modulo :=
-  {| TBOp := Z.modulo |}.
+Instance Op_Z_mod : BinOp Z.modulo :=
+  { TBOp := Z.modulo ; TBOpInj := ltac:(reflexivity) }.
 Add BinOp Op_Z_mod.
 
-Program Instance Op_Z_rem : BinOp Z.rem :=
-  {| TBOp := Z.rem |}.
+Instance Op_Z_rem : BinOp Z.rem :=
+  { TBOp := Z.rem ; TBOpInj := ltac:(reflexivity) }.
 Add BinOp Op_Z_rem.
 
-Program Instance Op_Z_quot : BinOp Z.quot :=
-  {| TBOp := Z.quot |}.
+Instance Op_Z_quot : BinOp Z.quot :=
+  { TBOp := Z.quot ; TBOpInj := ltac:(reflexivity) }.
 Add BinOp Op_Z_quot.
 
-Program Instance Op_Z_succ : UnOp Z.succ :=
-  {| TUOp := fun x => x + 1 |}.
+Instance Op_Z_succ : UnOp Z.succ :=
+  { TUOp := fun x => x + 1 ; TUOpInj := ltac:(reflexivity) }.
 Add UnOp Op_Z_succ.
 
-Program Instance Op_Z_pred : UnOp Z.pred :=
-  {| TUOp := fun x => x - 1 |}.
+Instance Op_Z_pred : UnOp Z.pred :=
+  { TUOp := fun x => x - 1 ; TUOpInj := ltac:(reflexivity) }.
 Add UnOp Op_Z_pred.
 
-
-Program Instance Op_Z_opp : UnOp Z.opp :=
-  {| TUOp := Z.opp |}.
+Instance Op_Z_opp : UnOp Z.opp :=
+  { TUOp := Z.opp ; TUOpInj := ltac:(reflexivity) }.
 Add UnOp Op_Z_opp.
 
-
-Program Instance Op_Z_abs : UnOp Z.abs :=
-  {| TUOp := Z.abs |}.
+Instance Op_Z_abs : UnOp Z.abs :=
+  { TUOp := Z.abs ; TUOpInj := ltac:(reflexivity) }.
 Add UnOp Op_Z_abs.
 
-Program Instance Op_Z_sgn : UnOp Z.sgn :=
-  {| TUOp := Z.sgn |}.
+Instance Op_Z_sgn : UnOp Z.sgn :=
+  { TUOp := Z.sgn ; TUOpInj := ltac:(reflexivity) }.
 Add UnOp Op_Z_sgn.
 
-Program Instance Op_Z_pow_pos : BinOp Z.pow_pos :=
-{| TBOp := Z.pow |}.
+Instance Op_Z_pow_pos : BinOp Z.pow_pos :=
+  { TBOp := Z.pow ; TBOpInj := ltac:(reflexivity) }.
 Add BinOp Op_Z_pow_pos.
 
 Lemma of_nat_to_nat_eq : forall x,  Z.of_nat (Z.to_nat x) = Z.max 0 x.
@@ -411,8 +399,8 @@ Proof.
   - reflexivity.
 Qed.
 
-Program Instance Op_Z_to_nat : UnOp Z.to_nat :=
-  {| TUOp := fun x => Z.max 0 x ; TUOpInj := of_nat_to_nat_eq |}.
+Instance Op_Z_to_nat : UnOp Z.to_nat :=
+  { TUOp := fun x => Z.max 0 x ; TUOpInj := of_nat_to_nat_eq }.
 Add UnOp Op_Z_to_nat.
 
 (** Specification of derived operators over Z *)

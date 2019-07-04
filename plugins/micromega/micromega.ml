@@ -87,6 +87,12 @@ let rec fold_left f l a0 =
   | [] -> a0
   | b::t0 -> fold_left f t0 (f a0 b)
 
+(** val fold_right : ('a2 -> 'a1 -> 'a1) -> 'a1 -> 'a2 list -> 'a1 **)
+
+let rec fold_right f a0 = function
+| [] -> a0
+| b::t0 -> f b (fold_right f a0 t0)
+
 type positive =
 | XI of positive
 | XO of positive
@@ -1105,6 +1111,39 @@ let and_cnf =
 
 type ('term, 'annot, 'tX, 'aF) tFormula = ('term, 'tX, 'annot, 'aF) gFormula
 
+(** val is_cnf_tt : ('a1, 'a2) cnf -> bool **)
+
+let is_cnf_tt = function
+| [] -> true
+| _::_ -> false
+
+(** val is_cnf_ff : ('a1, 'a2) cnf -> bool **)
+
+let is_cnf_ff = function
+| [] -> false
+| c0::l ->
+  (match c0 with
+   | [] -> (match l with
+            | [] -> true
+            | _::_ -> false)
+   | _::_ -> false)
+
+(** val and_cnf_opt : ('a1, 'a2) cnf -> ('a1, 'a2) cnf -> ('a1, 'a2) cnf **)
+
+let and_cnf_opt f1 f2 =
+  if if is_cnf_ff f1 then true else is_cnf_ff f2
+  then cnf_ff
+  else and_cnf f1 f2
+
+(** val or_cnf_opt :
+    ('a1 -> bool) -> ('a1 -> 'a1 -> 'a1 option) -> ('a1, 'a2) cnf -> ('a1,
+    'a2) cnf -> ('a1, 'a2) cnf **)
+
+let or_cnf_opt unsat deduce f1 f2 =
+  if if is_cnf_tt f1 then true else is_cnf_tt f2
+  then cnf_tt
+  else or_cnf unsat deduce f1 f2
+
 (** val xcnf :
     ('a2 -> bool) -> ('a2 -> 'a2 -> 'a2 option) -> ('a1 -> 'a3 -> ('a2, 'a3)
     cnf) -> ('a1 -> 'a3 -> ('a2, 'a3) cnf) -> bool -> ('a1, 'a3, 'a4, 'a5)
@@ -1117,23 +1156,23 @@ let rec xcnf unsat deduce normalise0 negate0 pol0 = function
 | A (x, t0) -> if pol0 then normalise0 x t0 else negate0 x t0
 | Cj (e1, e2) ->
   if pol0
-  then and_cnf (xcnf unsat deduce normalise0 negate0 pol0 e1)
+  then and_cnf_opt (xcnf unsat deduce normalise0 negate0 pol0 e1)
          (xcnf unsat deduce normalise0 negate0 pol0 e2)
-  else or_cnf unsat deduce (xcnf unsat deduce normalise0 negate0 pol0 e1)
+  else or_cnf_opt unsat deduce (xcnf unsat deduce normalise0 negate0 pol0 e1)
          (xcnf unsat deduce normalise0 negate0 pol0 e2)
 | D (e1, e2) ->
   if pol0
-  then or_cnf unsat deduce (xcnf unsat deduce normalise0 negate0 pol0 e1)
+  then or_cnf_opt unsat deduce (xcnf unsat deduce normalise0 negate0 pol0 e1)
          (xcnf unsat deduce normalise0 negate0 pol0 e2)
-  else and_cnf (xcnf unsat deduce normalise0 negate0 pol0 e1)
+  else and_cnf_opt (xcnf unsat deduce normalise0 negate0 pol0 e1)
          (xcnf unsat deduce normalise0 negate0 pol0 e2)
 | N e -> xcnf unsat deduce normalise0 negate0 (negb pol0) e
 | I (e1, _, e2) ->
   if pol0
-  then or_cnf unsat deduce
+  then or_cnf_opt unsat deduce
          (xcnf unsat deduce normalise0 negate0 (negb pol0) e1)
          (xcnf unsat deduce normalise0 negate0 pol0 e2)
-  else and_cnf (xcnf unsat deduce normalise0 negate0 (negb pol0) e1)
+  else and_cnf_opt (xcnf unsat deduce normalise0 negate0 (negb pol0) e1)
          (xcnf unsat deduce normalise0 negate0 pol0 e2)
 
 (** val radd_term :
@@ -1191,7 +1230,7 @@ let ror_clause_cnf unsat deduce t0 f =
   | _::_ -> xror_clause_cnf unsat deduce t0 f
 
 (** val ror_cnf :
-    ('a1 -> bool) -> ('a1 -> 'a1 -> 'a1 option) -> ('a1 * 'a2) list list ->
+    ('a1 -> bool) -> ('a1 -> 'a1 -> 'a1 option) -> ('a1, 'a2) clause list ->
     ('a1, 'a2) clause list -> ('a1, 'a2) cnf * 'a2 list **)
 
 let rec ror_cnf unsat deduce f f' =
@@ -1202,16 +1241,26 @@ let rec ror_cnf unsat deduce f f' =
     let e_f',t' = ror_clause_cnf unsat deduce e f' in
     (rev_append rst_f' e_f'),(rev_append t0 t')
 
-(** val is_cnf_ff : ('a1, 'a2) cnf -> bool **)
+(** val annot_of_clause : ('a1, 'a2) clause -> 'a2 list **)
 
-let is_cnf_ff = function
-| [] -> false
-| c0::l ->
-  (match c0 with
-   | [] -> (match l with
-            | [] -> true
-            | _::_ -> false)
-   | _::_ -> false)
+let annot_of_clause l =
+  map snd l
+
+(** val annot_of_cnf : ('a1, 'a2) cnf -> 'a2 list **)
+
+let annot_of_cnf f =
+  fold_left (fun acc e -> rev_append (annot_of_clause e) acc) f []
+
+(** val ror_cnf_opt :
+    ('a1 -> bool) -> ('a1 -> 'a1 -> 'a1 option) -> ('a1, 'a2) cnf -> ('a1,
+    'a2) cnf -> ('a1, 'a2) cnf * 'a2 list **)
+
+let ror_cnf_opt unsat deduce f1 f2 =
+  if is_cnf_tt f1
+  then cnf_tt,(annot_of_cnf f1)
+  else if is_cnf_tt f2
+       then cnf_tt,(annot_of_cnf f2)
+       else ror_cnf unsat deduce f1 f2
 
 (** val is_ff_no_deps_id : ('a1, 'a2) cnf -> 'a2 list -> 'a3 list -> bool **)
 
@@ -1231,6 +1280,14 @@ let ocons o l =
   | Some e -> e::l
   | None -> l
 
+(** val ratom :
+    ('a1, 'a2) cnf -> 'a2 -> (('a1, 'a2) cnf * 'a2 list) * 'a3 list **)
+
+let ratom c a =
+  if if is_cnf_ff c then true else is_cnf_tt c
+  then (c,(a::[])),[]
+  else (c,[]),[]
+
 (** val rxcnf :
     ('a2 -> bool) -> ('a2 -> 'a2 -> 'a2 option) -> ('a1 -> 'a3 -> ('a2, 'a3)
     cnf) -> ('a1 -> 'a3 -> ('a2, 'a3) cnf) -> bool -> ('a1, 'a3, 'a4, 'a5)
@@ -1240,15 +1297,15 @@ let rec rxcnf unsat deduce normalise0 negate0 polarity = function
 | TT -> if polarity then (cnf_tt,[]),[] else (cnf_ff,[]),[]
 | FF -> if polarity then (cnf_ff,[]),[] else (cnf_tt,[]),[]
 | X _ -> (cnf_ff,[]),[]
-| A (x, t0) -> ((if polarity then normalise0 x t0 else negate0 x t0),[]),[]
+| A (x, t0) -> ratom (if polarity then normalise0 x t0 else negate0 x t0) t0
 | Cj (e1, e2) ->
   let p,h1 = rxcnf unsat deduce normalise0 negate0 polarity e1 in
   let e3,t1 = p in
   let p2,h2 = rxcnf unsat deduce normalise0 negate0 polarity e2 in
   let e4,t2 = p2 in
   if polarity
-  then ((rev_append e3 e4),(rev_append t1 t2)),(rev_append h1 h2)
-  else let f',t' = ror_cnf unsat deduce e3 e4 in
+  then ((and_cnf_opt e3 e4),(rev_append t1 t2)),(rev_append h1 h2)
+  else let f',t' = ror_cnf_opt unsat deduce e3 e4 in
        (f',(rev_append t1 (rev_append t2 t'))),(rev_append h1 h2)
 | D (e1, e2) ->
   let p,h1 = rxcnf unsat deduce normalise0 negate0 polarity e1 in
@@ -1256,9 +1313,9 @@ let rec rxcnf unsat deduce normalise0 negate0 polarity = function
   let p2,h2 = rxcnf unsat deduce normalise0 negate0 polarity e2 in
   let e4,t2 = p2 in
   if polarity
-  then let f',t' = ror_cnf unsat deduce e3 e4 in
+  then let f',t' = ror_cnf_opt unsat deduce e3 e4 in
        (f',(rev_append t1 (rev_append t2 t'))),(rev_append h1 h2)
-  else ((rev_append e3 e4),(rev_append t1 t2)),(rev_append h1 h2)
+  else ((and_cnf_opt e3 e4),(rev_append t1 t2)),(rev_append h1 h2)
 | N e -> rxcnf unsat deduce normalise0 negate0 (negb polarity) e
 | I (e1, a, e2) ->
   let p,h1 = rxcnf unsat deduce normalise0 negate0 (negb polarity) e1 in
@@ -1268,12 +1325,12 @@ let rec rxcnf unsat deduce normalise0 negate0 polarity = function
        then rxcnf unsat deduce normalise0 negate0 polarity e2
        else let p2,h2 = rxcnf unsat deduce normalise0 negate0 polarity e2 in
             let e4,t2 = p2 in
-            let f',t' = ror_cnf unsat deduce e3 e4 in
+            let f',t' = ror_cnf_opt unsat deduce e3 e4 in
             (f',(rev_append t1 (rev_append t2 t'))),(ocons a
                                                       (rev_append h1 h2))
   else let p2,h2 = rxcnf unsat deduce normalise0 negate0 polarity e2 in
        let e4,t2 = p2 in
-       ((and_cnf e3 e4),(rev_append t1 t2)),(rev_append h1 h2)
+       ((and_cnf_opt e3 e4),(rev_append t1 t2)),(rev_append h1 h2)
 
 (** val cnf_checker :
     (('a1 * 'a2) list -> 'a3 -> bool) -> ('a1, 'a2) cnf -> 'a3 list -> bool **)
@@ -1773,52 +1830,6 @@ let padd1 =
 let normZ =
   norm Z0 (Zpos XH) Z.add Z.mul Z.sub Z.opp zeq_bool
 
-(** val xnormalise0 : z formula -> z nFormula list **)
-
-let xnormalise0 t0 =
-  let { flhs = lhs; fop = o; frhs = rhs } = t0 in
-  let lhs0 = normZ lhs in
-  let rhs0 = normZ rhs in
-  (match o with
-   | OpEq ->
-     ((psub1 lhs0 (padd1 rhs0 (Pc (Zpos XH)))),NonStrict)::(((psub1 rhs0
-                                                               (padd1 lhs0
-                                                                 (Pc (Zpos
-                                                                 XH)))),NonStrict)::[])
-   | OpNEq -> ((psub1 lhs0 rhs0),Equal)::[]
-   | OpLe -> ((psub1 lhs0 (padd1 rhs0 (Pc (Zpos XH)))),NonStrict)::[]
-   | OpGe -> ((psub1 rhs0 (padd1 lhs0 (Pc (Zpos XH)))),NonStrict)::[]
-   | OpLt -> ((psub1 lhs0 rhs0),NonStrict)::[]
-   | OpGt -> ((psub1 rhs0 lhs0),NonStrict)::[])
-
-(** val normalise : z formula -> 'a1 -> (z nFormula, 'a1) cnf **)
-
-let normalise t0 tg =
-  map (fun x -> (x,tg)::[]) (xnormalise0 t0)
-
-(** val xnegate0 : z formula -> z nFormula list **)
-
-let xnegate0 t0 =
-  let { flhs = lhs; fop = o; frhs = rhs } = t0 in
-  let lhs0 = normZ lhs in
-  let rhs0 = normZ rhs in
-  (match o with
-   | OpEq -> ((psub1 lhs0 rhs0),Equal)::[]
-   | OpNEq ->
-     ((psub1 lhs0 (padd1 rhs0 (Pc (Zpos XH)))),NonStrict)::(((psub1 rhs0
-                                                               (padd1 lhs0
-                                                                 (Pc (Zpos
-                                                                 XH)))),NonStrict)::[])
-   | OpLe -> ((psub1 rhs0 lhs0),NonStrict)::[]
-   | OpGe -> ((psub1 lhs0 rhs0),NonStrict)::[]
-   | OpLt -> ((psub1 rhs0 (padd1 lhs0 (Pc (Zpos XH)))),NonStrict)::[]
-   | OpGt -> ((psub1 lhs0 (padd1 rhs0 (Pc (Zpos XH)))),NonStrict)::[])
-
-(** val negate : z formula -> 'a1 -> (z nFormula, 'a1) cnf **)
-
-let negate t0 tg =
-  map (fun x -> (x,tg)::[]) (xnegate0 t0)
-
 (** val zunsat : z nFormula -> bool **)
 
 let zunsat =
@@ -1828,6 +1839,60 @@ let zunsat =
 
 let zdeduce =
   nformula_plus_nformula Z0 Z.add zeq_bool
+
+(** val xnnormalise : z formula -> z nFormula **)
+
+let xnnormalise t0 =
+  let { flhs = lhs; fop = o; frhs = rhs } = t0 in
+  let lhs0 = normZ lhs in
+  let rhs0 = normZ rhs in
+  (match o with
+   | OpEq -> (psub1 rhs0 lhs0),Equal
+   | OpNEq -> (psub1 rhs0 lhs0),NonEqual
+   | OpLe -> (psub1 rhs0 lhs0),NonStrict
+   | OpGe -> (psub1 lhs0 rhs0),NonStrict
+   | OpLt -> (psub1 rhs0 lhs0),Strict
+   | OpGt -> (psub1 lhs0 rhs0),Strict)
+
+(** val xnormalise0 : z nFormula -> z nFormula list **)
+
+let xnormalise0 = function
+| e,o ->
+  (match o with
+   | Equal ->
+     ((psub1 e (Pc (Zpos XH))),NonStrict)::(((psub1 (Pc (Zneg XH)) e),NonStrict)::[])
+   | NonEqual -> (e,Equal)::[]
+   | Strict -> ((psub1 (Pc Z0) e),NonStrict)::[]
+   | NonStrict -> ((psub1 (Pc (Zneg XH)) e),NonStrict)::[])
+
+(** val cnf_of_list :
+    'a1 -> z nFormula list -> (z nFormula * 'a1) list list **)
+
+let cnf_of_list tg l =
+  fold_right (fun x acc -> if zunsat x then acc else ((x,tg)::[])::acc)
+    cnf_tt l
+
+(** val normalise : z formula -> 'a1 -> (z nFormula, 'a1) cnf **)
+
+let normalise t0 tg =
+  let f = xnnormalise t0 in
+  if zunsat f then cnf_ff else cnf_of_list tg (xnormalise0 f)
+
+(** val xnegate0 : z nFormula -> z nFormula list **)
+
+let xnegate0 = function
+| e,o ->
+  (match o with
+   | NonEqual ->
+     ((psub1 e (Pc (Zpos XH))),NonStrict)::(((psub1 (Pc (Zneg XH)) e),NonStrict)::[])
+   | Strict -> ((psub1 e (Pc (Zpos XH))),NonStrict)::[]
+   | x -> (e,x)::[])
+
+(** val negate : z formula -> 'a1 -> (z nFormula, 'a1) cnf **)
+
+let negate t0 tg =
+  let f = xnnormalise t0 in
+  if zunsat f then cnf_tt else cnf_of_list tg (xnegate0 f)
 
 (** val cnfZ :
     (z formula, 'a1, 'a2, 'a3) tFormula -> ((z nFormula, 'a1) cnf * 'a1

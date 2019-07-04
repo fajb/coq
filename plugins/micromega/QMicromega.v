@@ -204,7 +204,7 @@ Proof.
     unfold eval_nformula. unfold RingMicromega.eval_nformula.
     destruct t.
     apply (check_inconsistent_sound Qsor QSORaddon) ; auto.
-  - unfold qdeduce. apply (nformula_plus_nformula_correct Qsor QSORaddon).
+  - unfold qdeduce. intros. revert H. apply (nformula_plus_nformula_correct Qsor QSORaddon);auto.
   - intros. rewrite Qeval_formula_compat. unfold Qeval_formula'. now  eapply (cnf_normalise_correct Qsor QSORaddon);eauto.
   - intros. rewrite Qeval_formula_compat. unfold Qeval_formula'. now eapply (cnf_negate_correct Qsor QSORaddon);eauto.
   - intros t w0.

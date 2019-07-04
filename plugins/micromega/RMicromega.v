@@ -467,7 +467,9 @@ Proof.
   apply Reval_nformula_dec.
   - destruct t.
   apply (check_inconsistent_sound Rsor QSORaddon) ; auto.
-  - unfold rdeduce. apply (nformula_plus_nformula_correct Rsor QSORaddon).
+  - unfold rdeduce.
+    intros. revert H.
+    eapply (nformula_plus_nformula_correct Rsor QSORaddon); eauto.
   - now apply (cnf_normalise_correct Rsor QSORaddon).
   - intros. now eapply (cnf_negate_correct Rsor QSORaddon); eauto.
   - intros t w0.
