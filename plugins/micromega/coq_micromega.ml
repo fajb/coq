@@ -1628,6 +1628,7 @@ let compact_proofs (cnf_ff: 'cst cnf) res (cnf_ff': 'cst cnf) =
   if debug then
     begin
       Printf.printf "CNFRES\n"; flush stdout;
+      Printf.printf "CNFOLD %a\n"  pp_cnf_tag  cnf_ff;
       List.iter (fun (cl,(prf,prover)) ->
           let hyps_idx = prover.hyps prf in
           let hyps     = selecti hyps_idx cl in
@@ -1654,35 +1655,23 @@ let compact_proofs (cnf_ff: 'cst cnf) res (cnf_ff': 'cst cnf) =
   * variables. See the Tag module in mutils.ml for more.
   *)
 
-let abstract_formula hids hyps f =
-  Mc.(
-  let rec xabs f =
-    match f with
-      | X c -> X c
-      | A(a,(t,term)) -> if TagSet.mem t hyps then A(a,(t,term)) else X(term)
-      | Cj(f1,f2) ->
-          (match xabs f1 , xabs f2 with
-            |   X a1    ,  X a2   -> X (EConstr.mkApp(Lazy.force coq_and, [|a1;a2|]))
-            |    f1     , f2      -> Cj(f1,f2) )
-      | D(f1,f2) ->
-          (match xabs f1 , xabs f2 with
-            |   X a1    ,  X a2   -> X (EConstr.mkApp(Lazy.force coq_or, [|a1;a2|]))
-            |    f1     , f2      -> D(f1,f2) )
-      | N(f) ->
-          (match xabs f with
-            |   X a    -> X (EConstr.mkApp(Lazy.force coq_not, [|a|]))
-            |     f     -> N f)
-      | I(f1,hyp,f2) ->
-          (match xabs f1 , hyp, xabs f2 with
-            | X a1   , Some _ , af2    ->  af2
-            | X a1   , None   , X a2   -> X (EConstr.mkArrow a1 Sorts.Relevant a2)
-            | af1    , None   , af2    -> I(af1,None,af2)
-            | af1    , Some id, af2    -> if List.mem id hids then I(af1, Some id, af2)
-                                          else af2
-          )
-      | FF -> FF
-      | TT -> TT
-  in  xabs f)
+
+
+let abstract_formula : TagSet.t -> 'a formula -> 'a formula =
+  fun hyps f ->
+  let to_constr = Mc.({
+                              mkTT = Lazy.force coq_True;
+                              mkFF = Lazy.force coq_False;
+                              mkA  = (fun a (tg, t) -> t);
+                              mkCj = (let coq_and = Lazy.force coq_and in
+                                      fun x y -> EConstr.mkApp(coq_and,[|x;y|]));
+                              mkD = (let coq_or = Lazy.force coq_or in
+                                     fun x y -> EConstr.mkApp(coq_or,[|x;y|]));
+                              mkI = (fun x y -> EConstr.mkArrow x Sorts.Relevant y);
+                              mkN = (let coq_not = Lazy.force coq_not in
+                                     (fun x -> EConstr.mkApp(coq_not,[|x|])))
+                  }) in
+  Mc.abst_form to_constr (fun (t,_) -> TagSet.mem t hyps) true  f
 
 
 (* [abstract_wrt_formula] is used in contexts whre f1 is already an abstraction of f2   *)
@@ -1736,8 +1725,8 @@ let micromega_tauto pre_process cnf spec prover env (polys1: (Names.Id.t * 'cst 
  let mt = CamlToCoq.positive (max_tag ff) in
 
  (* Construction of cnf *)
- let pre_ff = pre_process mt ff in
- let ((cnf_ff,cnf_ff_tags),hids) = cnf pre_ff  in
+ let pre_ff = pre_process mt (ff:'a formula) in
+ let (cnf_ff,cnf_ff_tags) = cnf pre_ff  in
 
  match witness_list_tags prover cnf_ff with
  | Model m -> Model m
@@ -1751,19 +1740,21 @@ let micromega_tauto pre_process cnf spec prover env (polys1: (Names.Id.t * 'cst 
                                    (*try*) TagSet.add t s (* with Invalid_argument _ -> s*)) (p.hyps prf) TagSet.empty in
                     TagSet.union s tags) (List.fold_left (fun s (i,_) -> TagSet.add i s) TagSet.empty cnf_ff_tags) (List.combine cnf_ff res) in
 
-     let ff'     = abstract_formula hids deps ff in
+     let ff'     = abstract_formula deps ff in
 
      let pre_ff'  = pre_process mt ff' in
 
-     let (cnf_ff',_),_ = cnf pre_ff' in
+     let (cnf_ff',_) = cnf pre_ff' in
 
   if debug then
     begin
       output_string stdout "\n";
       Printf.printf "TForm    : %a\n" pp_formula ff ; flush stdout;
+      Printf.printf "CNF    : %a\n" pp_cnf_tag cnf_ff ; flush stdout;
       Printf.printf "TFormAbs : %a\n" pp_formula ff' ; flush stdout;
       Printf.printf "TFormPre : %a\n" pp_formula pre_ff ; flush stdout;
       Printf.printf "TFormPreAbs : %a\n" pp_formula pre_ff' ; flush stdout;
+      Printf.printf "CNF    : %a\n" pp_cnf_tag cnf_ff' ; flush stdout;
     end;
 
   (* Even if it does not work, this does not mean it is not provable
@@ -1775,6 +1766,7 @@ let micromega_tauto pre_process cnf spec prover env (polys1: (Names.Id.t * 'cst 
           | None -> failwith "abstraction is wrong"
           | Some res -> ()
       end ; *)
+
   let res' = compact_proofs cnf_ff res cnf_ff' in
 
   let (ff',res',ids) = (ff',res', Mc.ids_of_formula ff') in
@@ -1931,6 +1923,7 @@ let micromega_genr prover tac =
        | Prf (ids,ff',res') ->
          let (ff,ids) = formula_hyps_concl
              (List.filter (fun (n,_) -> List.mem n ids) hyps) concl in
+
          let ff' = abstract_wrt_formula ff' ff  in
 
          let (arith_goal,props,vars,ff_arith) = make_goal_of_formula gl0 (Lazy.force dump_rexpr)  ff' in
@@ -1961,8 +1954,8 @@ let micromega_genr prover tac =
          [
            kill_arith;
            (Tacticals.New.tclTHENLIST
-            [(Tactics.generalize (List.map EConstr.mkVar ids));
-             Tactics.exact_check (EConstr.applist (EConstr.mkVar goal_name, arith_args))
+              [(Tactics.generalize (List.map EConstr.mkVar ids));
+               (Tactics.exact_check (EConstr.applist (EConstr.mkVar goal_name, arith_args)))
             ] )
          ]
 
