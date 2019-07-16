@@ -8,22 +8,18 @@
 (*         *     (see LICENSE file for the text of the license)         *)
 (************************************************************************)
 open Constrexpr
-module InjTable : sig val register : constr_expr -> unit end
-module UnOp     : sig val register : constr_expr -> unit end
-module BinOp    : sig val register : constr_expr -> unit end
-module CstOp    : sig val register : constr_expr -> unit end
-module BinRel   : sig val register : constr_expr -> unit end
-module PropOp   : sig val register : constr_expr -> unit end
-module Spec     : sig val register : constr_expr -> unit end
-module Saturate : sig val register : constr_expr -> unit end
+
+module type S = sig val register : constr_expr -> unit val print : unit -> unit end
+
+module InjTable : S
+module UnOp     : S
+module BinOp    : S
+module CstOp    : S
+module BinRel   : S
+module PropOp   : S
+module Spec     : S
+module Saturate : S
 
 val zify_tac : unit Proofview.tactic
 val saturate : unit Proofview.tactic
 val iter_specs : (EConstr.t -> unit Proofview.tactic) -> unit Proofview.tactic
-
-val print_zify_types : unit -> unit
-val print_zify_binop : unit -> unit
-val print_zify_unop  : unit -> unit
-val print_zify_cst   : unit -> unit
-val print_zify_binrel: unit -> unit
-val print_zify_spec  : unit -> unit

@@ -13,22 +13,11 @@
 open Ltac_plugin
 open Stdarg
 open Tacarg
-open Pp
-
-let iter_hyps (tac:Tacinterp.Value.t) =
-  Proofview.Goal.enter  begin fun gl ->
-    let hyps = List.rev (Tacmach.New.pf_hyps_types gl) in
-
-    Tacticals.New.tclTHENLIST
-          (List.map (fun (h,t) -> Tacticals.New.tclTRY (Tacinterp.Value.apply tac [Tacinterp.Value.of_constr (EConstr.mkVar h) ; Tacinterp.Value.of_constr t])) hyps)
-    end
 
 let iter_specs (tac: Tacinterp.Value.t) =
     Zify.iter_specs (fun c -> Tacinterp.Value.apply tac [Tacinterp.Value.of_constr c])
 
 }
-
-
 
 DECLARE PLUGIN "zify_plugin"
 
@@ -56,21 +45,11 @@ TACTIC EXTEND TRANS
 | [ "saturate"  ] -> { Zify.saturate }
 END
 
-TACTIC EXTEND SHOW
-| [ "show_term"  ] -> {
-    Proofview.Goal.enter  begin fun gl ->
-      let concl = Tacmach.New.pf_concl gl in
-      Feedback.msg_debug (Pp.str "Term :" ++ (Termops.Internal.debug_print_constr concl)) ;
-      Tacticals.New.tclIDTAC
-      end
-  }
-END
-
 VERNAC COMMAND EXTEND ZifyPrint CLASSIFIED AS SIDEFF
-|[ "Show" "Zify" "InjTyp" ] -> { Zify.print_zify_types () }
-|[ "Show" "Zify" "BinOp" ]  -> { Zify.print_zify_binop () }
-|[ "Show" "Zify" "UnOp" ]   -> { Zify.print_zify_unop () }
-|[ "Show" "Zify" "CstOp"]   -> { Zify.print_zify_cst () }
-|[ "Show" "Zify" "BinRel"]  -> { Zify.print_zify_binrel () }
-|[ "Show" "Zify" "Spec"]  -> { Zify.print_zify_spec () }
+|[ "Show" "Zify" "InjTyp" ] -> { Zify.InjTable.print () }
+|[ "Show" "Zify" "BinOp" ]  -> { Zify.BinOp.print () }
+|[ "Show" "Zify" "UnOp" ]   -> { Zify.UnOp.print () }
+|[ "Show" "Zify" "CstOp"]   -> { Zify.CstOp.print () }
+|[ "Show" "Zify" "BinRel"]  -> { Zify.BinRel.print () }
+|[ "Show" "Zify" "Spec"]    -> { Zify.Spec.print () }
 END
