@@ -1073,3 +1073,6 @@ let saturate  =
     sat concl ; List.iter (fun (_,t) -> sat t) hyps ;
     Tacticals.New.tclTHENLIST (CstrTable.HConstr.fold (fun c d acc -> (sat_constr c d)::acc) table [] )
     end
+
+let iter_specs (tac: Tacinterp.Value.t) =
+  iter_specs (fun c -> Tacinterp.Value.apply tac [Tacinterp.Value.of_constr c])
