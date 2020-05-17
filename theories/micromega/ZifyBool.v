@@ -65,6 +65,7 @@ Add CstOp Op_false.
 
 Instance Op_Zeqb : BinOp Z.eqb :=
   { TBOp := Z.eqb ; TBOpInj := ltac:(reflexivity)}.
+Add BinOp Op_Zeqb.
 
 Instance Op_Zleb : BinOp Z.leb :=
   { TBOp := Z.leb;
