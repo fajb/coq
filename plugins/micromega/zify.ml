@@ -373,7 +373,7 @@ module EInj = struct
     ; target = a.(1)
     ; inj = a.(2)
     ; pred = a.(3)
-    ; cstr = (if isid then None else Some a.(4)) }
+    ; cstr = (*if isid then None else*) Some a.(4) }
 
   let get_key = 0
 end
@@ -627,17 +627,30 @@ module ESat = struct
   let get_key = 1
 end
 
-module ESpec = struct
+module EUnopSpec = struct
   open ESpecT
 
   type elt = ESpecT.t
 
-  let name = "Spec"
+  let name = "UnopSpec"
+  let table = specs
+  let cast x = Spec x
+  let dest = function Spec x -> Some x | _ -> None
+  let mk_elt evd i a = {spec = a.(4)}
+  let get_key = 2
+end
+
+module EBinOpSpec = struct
+  open ESpecT
+
+  type elt = ESpecT.t
+
+  let name = "BinOpSpec"
   let table = specs
   let cast x = Spec x
   let dest = function Spec x -> Some x | _ -> None
   let mk_elt evd i a = {spec = a.(5)}
-  let get_key = 2
+  let get_key = 3
 end
 
 module BinOp = MakeTable (EBinOp)
@@ -647,7 +660,8 @@ module BinRel = MakeTable (EBinRel)
 module PropBinOp = MakeTable (EPropBinOp)
 module PropUnOp = MakeTable (EPropUnOp)
 module Saturate = MakeTable (ESat)
-module Spec = MakeTable (ESpec)
+module UnOpSpec = MakeTable (EUnopSpec)
+module BinOpSpec = MakeTable (EBinOpSpec)
 
 let init_cache () =
   table_cache := !table;

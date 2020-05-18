@@ -14,7 +14,8 @@ Local Open Scope Z_scope.
 (* Instances of [ZifyClasses] for dealing with boolean operators. *)
 
 Instance Inj_bool_bool : InjTyp bool bool :=
-  { inj := (fun x => x) ; pred := (fun x => True) ; cstr := (fun _ => I)}.
+  { inj := (fun x => x) ; pred := (fun b => b = true \/ b = false) ;
+    cstr := (ltac:(intro b; destruct b; tauto))}.
 Add InjTyp Inj_bool_bool.
 
 (** Boolean operators *)
@@ -138,3 +139,33 @@ Instance Op_nat_ltb : BinOp Nat.ltb :=
     TBOpInj := Z_of_nat_ltb_iff
   }.
 Add BinOp Op_nat_ltb.
+
+Lemma b2n_b2z :  forall x,  Z.of_nat (Nat.b2n x) = Z.b2z x.
+Proof.
+  intro.
+  destruct x ; reflexivity.
+Qed.
+
+Instance Op_b2n : UnOp Nat.b2n :=
+  { TUOp := Z.b2z;
+    TUOpInj := b2n_b2z }.
+Add UnOp Op_b2n.
+
+Lemma b2z_spec : forall b, (b = true /\ Z.b2z b = 1) \/ (b = false /\ Z.b2z b = 0).
+Proof.
+  destruct b ; simpl; intuition congruence.
+Qed.
+
+Instance b2zSpec : UnOpSpec Z.b2z :=
+  {| UPred := fun b r => (b = true /\ r = 1) \/ (b = false /\ r = 0);
+     USpec := b2z_spec
+  |}.
+Add UnOpSpec b2zSpec.
+
+Ltac elim_bool_cstr :=
+  repeat match goal with
+         | C : ?B = true \/ ?B = false |- _ =>
+           destruct C ; subst
+         end.
+
+Ltac Zify.zify_post_hook ::= elim_bool_cstr.

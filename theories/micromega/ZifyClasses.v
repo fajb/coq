@@ -90,15 +90,15 @@ Class PropUOp (Op : Prop -> Prop) :=
     NB1: The Ltac code is currently limited to (Op: Z -> Z -> Z)
     NB2: This is not sufficient to cope with [Z.div] or [Z.mod]
  *)
-Class BinOpSpec {S T: Type} (Op : T -> T -> T) {I : InjTyp S T} :=
+Class BinOpSpec {T1 T2 T3: Type} (Op : T1 -> T2 -> T3)  :=
   mkbspec {
-      BPred : T -> T -> T -> Prop;
+      BPred : T1 -> T2 -> T3 -> Prop;
       BSpec : forall x y, BPred x y (Op x y)
     }.
 
-Class UnOpSpec {S T: Type} (Op : T -> T) {I : InjTyp S T} :=
+Class UnOpSpec {T1 T2: Type} (Op : T1 -> T2)  :=
   mkuspec {
-      UPred : T -> T -> Prop;
+      UPred : T1 -> T2 -> Prop;
       USpec : forall x, UPred x (Op x)
     }.
 
