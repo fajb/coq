@@ -46,6 +46,10 @@ Instance Op_xorb : BinOp xorb :=
     TBOpInj := xorb_eq }.
 Add BinOp Op_xorb.
 
+Instance Op_eqb : BinOp eqb :=
+  { TBOp := eqb; TBOpInj := ltac:(reflexivity) }.
+Add BinOp Op_eqb.
+
 Instance Op_negb : UnOp negb :=
   { TUOp := negb ; TUOpInj := ltac:(reflexivity)}.
 Add UnOp Op_negb.
@@ -84,6 +88,7 @@ Instance Op_Zltb : BinOp Z.ltb :=
   { TBOp := Z.ltb ;
     TBOpInj := ltac:(reflexivity)
   }.
+Add BinOp Op_Zltb.
 
 Instance Op_Zgtb : BinOp Z.gtb :=
   { TBOp := Z.gtb;
@@ -150,6 +155,11 @@ Instance Op_b2n : UnOp Nat.b2n :=
   { TUOp := Z.b2z;
     TUOpInj := b2n_b2z }.
 Add UnOp Op_b2n.
+
+Instance Op_b2z : UnOp Z.b2z :=
+  { TUOp := Z.b2z;
+    TUOpInj := ltac:(reflexivity) }.
+Add UnOp Op_b2z.
 
 Lemma b2z_spec : forall b, (b = true /\ Z.b2z b = 1) \/ (b = false /\ Z.b2z b = 0).
 Proof.
