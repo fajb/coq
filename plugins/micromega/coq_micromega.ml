@@ -1486,6 +1486,10 @@ let max_tag f =
   * Instantiate the current Coq goal with a Micromega formula, a varmap, and a
   * witness.
   *)
+let change_concl t =
+  try Tactics.change_in_concl ~check:false None (Tactics.make_change_arg t)
+  with CErrors.UserError _ ->
+    CErrors.user_err (Printer.pr_econstr_env (Global.env ()) Evd.empty t)
 
 let micromega_order_change spec cert cert_typ env ff (*: unit Proofview.tactic*)
     =
@@ -1496,7 +1500,7 @@ let micromega_order_change spec cert cert_typ env ff (*: unit Proofview.tactic*)
   (* todo : directly generate the proof term - or generalize before conversion? *)
   Proofview.Goal.enter (fun gl ->
       Tacticals.New.tclTHENLIST
-        [ Tactics.change_concl
+        [ change_concl
             (set
                [ ( "__ff"
                  , ff
@@ -2464,6 +2468,203 @@ let print_lia_profile () =
         ++ int average_pivots ++ fnl ()
         ++ str "maximum number of pivots: "
         ++ int maximum_pivots ++ fnl ()))
+
+(** Generic Lra *)
+
+type lra_decl =
+  { r : EConstr.t
+  ; rO : EConstr.t
+  ; rel_table : (EConstr.t Lazy.t * Mc.op2) list
+  ; rop_table : (EConstr.t Lazy.t * Mc.q op) list
+  ; q2r : EConstr.t
+  ; thm : EConstr.t (* redundant with rop_table *)
+  ; add : EConstr.t
+  ; sub : EConstr.t
+  ; opp : EConstr.t
+  ; mul : EConstr.t
+  ; pow : EConstr.t }
+
+let lra_decl = Summary.ref ~name:"lra_table" None
+let whd = Reductionops.clos_whd_flags CClosure.all
+
+let register_constr env evd c =
+  let decl = EConstr.of_constr c in
+  match EConstr.kind evd (whd env evd decl) with
+  | App (_, a) ->
+    let r = a.(0) in
+    let rO = a.(1) in
+    let rI = a.(2) in
+    let rplus = a.(3) in
+    let rtimes = a.(4) in
+    let rminus = a.(5) in
+    let ropp = a.(6) in
+    let req = a.(7) in
+    let rle = a.(8) in
+    let rlt = a.(9) in
+    let q2r = a.(10) in
+    let e = a.(11) in
+    let rpow = a.(12) in
+    let pow_phi = a.(13) in
+    let thm =
+      EConstr.of_constr
+        (UnivGen.constr_of_monomorphic_global (Coqlib.lib_ref "lra.thm"))
+    in
+    let lra =
+      { r
+      ; rO
+      ; rel_table =
+          [(lazy req, Mc.OpEq); (lazy rle, Mc.OpLe); (lazy rlt, Mc.OpLt)]
+      ; rop_table =
+          [ (lazy rplus, Binop (fun x y -> Mc.PEadd (x, y)))
+          ; (lazy rminus, Binop (fun x y -> Mc.PEsub (x, y)))
+          ; (lazy rtimes, Binop (fun x y -> Mc.PEmul (x, y)))
+          ; (lazy ropp, Opp) ]
+      ; q2r
+      ; opp = ropp
+      ; add = rplus
+      ; sub = rminus
+      ; mul = rtimes
+      ; pow = rpow
+      ; thm =
+          EConstr.mkApp
+            ( thm
+            , [| r
+               ; rO
+               ; rI
+               ; rplus
+               ; rtimes
+               ; rminus
+               ; ropp
+               ; req
+               ; rle
+               ; rlt
+               ; q2r
+               ; e
+               ; rpow
+               ; pow_phi
+               ; decl |] ) }
+    in
+    lra_decl := Some lra
+  | _ -> failwith "Cannot register LRA"
+
+let name =
+  let n = ref 0 in
+  fun () -> incr n; string_of_int !n
+
+let register_obj : Constr.constr -> Libobject.obj =
+  let cache_constr (_, c) =
+    let env = Global.env () in
+    let evd = Evd.from_env env in
+    register_constr env evd c
+  in
+  let subst_constr (subst, c) = Mod_subst.subst_mps subst c in
+  Libobject.declare_object
+  @@ Libobject.global_object_nodischarge
+       ("register-lra-" ^ name ())
+       ~cache:cache_constr ~subst:(Some subst_constr)
+
+let register_lra c =
+  let env = Global.env () in
+  let evd = Evd.from_env env in
+  let evd, c = Constrintern.interp_open_constr env evd c in
+  let _ = Lib.add_anonymous_leaf (register_obj (EConstr.to_constr evd c)) in
+  ()
+
+let get_binop op args =
+  let len = Array.length args in
+  if len = 2 then (op, args.(0), args.(1))
+  else if len < 2 then raise ParseError
+  else
+    ( EConstr.mkApp (op, Array.sub args 0 (len - 2))
+    , args.(len - 2)
+    , args.(len - 1) )
+
+let eq_refl = lazy (constr_of_ref "core.eq.refl")
+let bool = lazy (constr_of_ref "core.bool.type")
+
+(*let tt = lazy (constr_of_ref "core.bool.true")*)
+let checker = lazy (constr_of_ref "lra.checker")
+let find = lazy (constr_of_ref "lra.find")
+
+let apply_prover_tac d =
+  Proofview.Goal.enter (fun gl ->
+      let fresh str =
+        Tactics.fresh_id_in_env Names.Id.Set.empty (Names.Id.of_string str)
+          (Proofview.Goal.env gl)
+      in
+      let wit = fresh "__wit" in
+      let vm = fresh "__varmap" in
+      let ff = fresh "__ff" in
+      let wit_var = EConstr.mkVar wit in
+      let ff_var = EConstr.mkVar ff in
+      let vm_var = EConstr.mkVar vm in
+      Tacticals.New.tclTHENLIST
+        [ Tactics.introduction wit
+        ; Tactics.introduction vm
+        ; Tactics.introduction ff
+        ; Tactics.exact_no_check
+            (EConstr.mkApp
+               ( d.thm
+               , [| ff_var
+                  ; wit_var
+                  ; EConstr.mkApp
+                      ( Lazy.force eq_refl
+                      , [| Lazy.force bool
+                         ; EConstr.mkApp
+                             (Lazy.force checker, [|ff_var; wit_var|]) |] )
+                  ; EConstr.mkApp (Lazy.force find, [|d.r; d.rO; vm_var|]) |] ))
+        ])
+
+let lra_gen tac =
+  match !lra_decl with
+  | None -> Tacticals.New.tclFAIL 0 (Pp.str "Cannot find a LRA declaration")
+  | Some d ->
+    let rop_table = d.rop_table in
+    let rel_table = d.rel_table in
+    let parse_rel gl (op, args) =
+      let sigma = gl.sigma in
+      let op, a1, a2 = get_binop op args in
+      (assoc_const sigma op rel_table, a1, a2)
+    in
+    let rconstant gl term =
+      let sigma = gl.sigma in
+      match EConstr.kind sigma term with
+      | App (c, a) ->
+        if EConstr.eq_constr sigma c d.q2r then qconstant gl a.(0)
+        else raise ParseError
+      | _ -> raise ParseError
+    in
+    let parse_rexpr gl =
+      parse_expr gl rconstant (fun _ _ -> raise ParseError) rop_table
+    in
+    let qr_domain_spec =
+      lazy
+        { typ = d.r
+        ; coeff = Lazy.force coq_Q
+        ; dump_coeff = dump_q
+        ; proof_typ = Lazy.force coq_QWitness
+        ; dump_proof = dump_psatz coq_Q dump_q
+        ; coeff_eq = Mc.qeq_bool }
+    in
+    let dump_rexpr =
+      lazy
+        { interp_typ = d.r
+        ; dump_cst = (fun x -> EConstr.mkApp (d.q2r, [|dump_q x|]))
+        ; dump_add = d.add
+        ; dump_sub = d.sub
+        ; dump_opp = d.opp
+        ; dump_mul = d.mul
+        ; dump_pow = d.pow
+        ; dump_pow_arg = (fun n -> raise ParseError)
+        ; dump_op = List.map (fun (x, y) -> (y, Lazy.force x)) d.rel_table }
+    in
+    let parse_rarith = parse_arith parse_rel parse_rexpr in
+    micromega_gen parse_rarith
+      (fun _ x -> x)
+      Mc.cnfQ qr_domain_spec dump_rexpr linear_prover_Q (tac d)
+
+let lra_g () = lra_gen apply_prover_tac
+let lra_g_debug () = lra_gen (fun _ -> Proofview.give_up)
 
 (* Local Variables: *)
 (* coding: utf-8 *)

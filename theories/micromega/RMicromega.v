@@ -435,7 +435,6 @@ Qed.
 Definition Reval_formula (e: PolEnv R) (k: Tauto.kind) (ff : Formula Rcst) :=
   let (lhs,o,rhs) := ff in Reval_op2 k o (Reval_expr e lhs) (Reval_expr e rhs).
 
-
 Definition Reval_formula' :=
   eval_sformula  Rplus Rmult Rminus Ropp (@eq R) Rle Rlt N.to_nat pow R_of_Rcst.
 

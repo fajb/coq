@@ -86,3 +86,12 @@ END
 VERNAC COMMAND EXTEND ShowLiaProfile CLASSIFIED AS QUERY
 | [ "Show" "Lia" "Profile" ] -> { Coq_micromega.print_lia_profile () }
 END
+
+VERNAC COMMAND EXTEND AddLRA CLASSIFIED AS SIDEFF
+| ["Add" "LRA" constr(t) ] -> { Coq_micromega.register_lra t }
+END
+
+TACTIC EXTEND LRAGEN
+| [ "lra_g" ] -> { Coq_micromega.lra_g () }
+| [ "lra_g_debug"  ] -> { Coq_micromega.lra_g_debug () }
+END

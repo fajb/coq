@@ -494,7 +494,8 @@ let nlinear_prover prfdepth sys =
   let sys1 = elim_simple_linear_equality sys in
   let sys2 = saturate_by_linear_equalities sys1 in
   let sys = nlinear_preprocess sys1 @ sys2 in
-  let sys = List.map (fun ((p, o), prf) -> (cstr_of_poly (p, o), prf)) sys in
+  let bnd = bound_monomials sys in
+  let sys = List.map (fun ((p, o), prf) -> (cstr_of_poly (p, o), prf)) (bnd@sys) in
   let id =
     List.fold_left
       (fun acc (_, r) -> max acc (ProofFormat.pr_rule_max_id r))
