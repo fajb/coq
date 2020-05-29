@@ -270,6 +270,24 @@ match o with
 | NonStrict => fun x : Z => 0 <= x
 end.
 
+Lemma Zeval_formula_dec :
+  forall (env : PolEnv Z) (d : Formula Z),
+  Zeval_formula env Tauto.isProp d \/ ~ Zeval_formula env Tauto.isProp d.
+Proof.
+  unfold Zeval_formula.
+  destruct d.
+  simpl.
+  generalize (Zeval_expr env Flhs) as x.
+  generalize (Zeval_expr env Frhs) as y.
+  destruct Fop ; simpl; intros.
+  + destruct (Z.eq_dec x y);
+    tauto.
+  + destruct (Z.eq_dec x y); tauto.
+  + destruct (Z_le_dec x y); tauto.
+  + destruct (Z_ge_dec x y); tauto.
+  + destruct (Z_lt_dec x y); tauto.
+  + destruct (Z_gt_dec x y); tauto.
+Qed.
 
 Lemma Zeval_nformula_dec : forall env d, (eval_nformula env d) \/ ~ (eval_nformula env d).
 Proof.
@@ -1730,7 +1748,6 @@ Proof.
   intros f w.
   unfold ZTautoChecker.
   apply tauto_checker_sound with (eval' := eval_nformula).
-  - apply Zeval_nformula_dec.
   - intros until env.
   unfold eval_nformula. unfold RingMicromega.eval_nformula.
   destruct t.
@@ -1758,7 +1775,10 @@ Proof.
     rewrite make_impl_map with (eval := eval_nformula env).
     eapply ZChecker_sound; eauto.
     tauto.
+  - apply Zeval_formula_dec.
 Qed.
+
+
 Fixpoint xhyps_of_pt (base:nat) (acc : list nat) (pt:ZArithProof)  : list nat :=
   match pt with
     | DoneProof => acc

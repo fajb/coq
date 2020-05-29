@@ -1773,7 +1773,7 @@ let micromega_tauto pre_process cnf spec prover env
   let mt = CamlToCoq.positive (max_tag ff) in
   (* Construction of cnf *)
   let pre_ff = pre_process mt (ff : 'a formula) in
-  let cnf_ff, cnf_ff_tags = cnf Mc.IsProp pre_ff in
+  let cnf_ff, cnf_ff_tags = cnf pre_ff in
   match witness_list_tags prover cnf_ff with
   | Model m -> Model m
   | Unknown -> Unknown
@@ -1799,7 +1799,7 @@ let micromega_tauto pre_process cnf spec prover env
     in
     let ff' = abstract_formula deps ff in
     let pre_ff' = pre_process mt ff' in
-    let cnf_ff', _ = cnf Mc.IsProp pre_ff' in
+    let cnf_ff', _ = cnf pre_ff' in
     if debug then begin
       output_string stdout "\n";
       Printf.printf "TForm    : %a\n" pp_formula ff;
@@ -2001,7 +2001,7 @@ let micromega_genr prover tac =
         match
           micromega_tauto
             (fun _ x -> x)
-            Mc.cnfQ spec prover env hyps' concl' gl0
+            (Mc.cnfQ Mc.IsProp true) spec prover env hyps' concl' gl0
         with
         | Unknown | Model _ ->
           flush stdout;
@@ -2389,12 +2389,12 @@ let micromega_genr prover tac =
 let lra_Q =
   micromega_gen parse_qarith
     (fun _ x -> x)
-    Mc.cnfQ qq_domain_spec dump_qexpr linear_prover_Q
+    (Mc.cnfQ Mc.IsProp true) qq_domain_spec dump_qexpr linear_prover_Q
 
 let psatz_Q i =
   micromega_gen parse_qarith
     (fun _ x -> x)
-    Mc.cnfQ qq_domain_spec dump_qexpr
+    (Mc.cnfQ Mc.IsProp true) qq_domain_spec dump_qexpr
     (non_linear_prover_Q "real_nonlinear_prover" (Some i))
 
 let lra_R = micromega_genr linear_prover_R
@@ -2405,19 +2405,19 @@ let psatz_R i =
 let psatz_Z i =
   micromega_gen parse_zarith
     (fun _ x -> x)
-    Mc.cnfZ zz_domain_spec dump_zexpr
+    (Mc.cnfZ Mc.IsProp) zz_domain_spec dump_zexpr
     (non_linear_prover_Z "real_nonlinear_prover" (Some i))
 
 let sos_Z =
   micromega_gen parse_zarith
     (fun _ x -> x)
-    Mc.cnfZ zz_domain_spec dump_zexpr
+    (Mc.cnfZ Mc.IsProp) zz_domain_spec dump_zexpr
     (non_linear_prover_Z "pure_sos" None)
 
 let sos_Q =
   micromega_gen parse_qarith
     (fun _ x -> x)
-    Mc.cnfQ qq_domain_spec dump_qexpr
+    (Mc.cnfQ Mc.IsProp true) qq_domain_spec dump_qexpr
     (non_linear_prover_Q "pure_sos" None)
 
 let sos_R = micromega_genr (non_linear_prover_R "pure_sos" None)
@@ -2425,19 +2425,19 @@ let sos_R = micromega_genr (non_linear_prover_R "pure_sos" None)
 let xlia =
   micromega_gen parse_zarith
     (fun _ x -> x)
-    Mc.cnfZ zz_domain_spec dump_zexpr linear_Z
+    (Mc.cnfZ Mc.IsProp) zz_domain_spec dump_zexpr linear_Z
 
 let xnlia =
   micromega_gen parse_zarith
     (fun _ x -> x)
-    Mc.cnfZ zz_domain_spec dump_zexpr nlinear_Z
+    (Mc.cnfZ Mc.IsProp) zz_domain_spec dump_zexpr nlinear_Z
 
 let nra = micromega_genr nlinear_prover_R
 
 let nqa =
   micromega_gen parse_qarith
     (fun _ x -> x)
-    Mc.cnfQ qq_domain_spec dump_qexpr nlinear_prover_R
+    (Mc.cnfQ Mc.IsProp true) qq_domain_spec dump_qexpr nlinear_prover_R
 
 let print_lia_profile () =
   Simplex.(
@@ -2655,7 +2655,8 @@ let lra_gen tac =
     let parse_rarith = parse_arith parse_rel parse_rexpr in
     micromega_gen parse_rarith
       (fun _ x -> x)
-      Mc.cnfQ qr_domain_spec dump_rexpr linear_prover_Q (tac d)
+      (fun x -> Mc.cnfQ Mc.IsProp false (Mc.negate_formula Mc.IsProp x))
+      qr_domain_spec dump_rexpr linear_prover_Q (tac d)
 
 let lra_g () = lra_gen apply_prover_tac
 let lra_g_debug () = lra_gen (fun _ -> Proofview.give_up)

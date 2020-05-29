@@ -381,7 +381,7 @@ val mk_impl :
   -> ('a1, 'a3, 'a4, 'a5) tFormula
   -> ('a2, 'a3) cnf
 
-val mk_iff :
+val mk_eq :
      ('a2 -> bool)
   -> ('a2 -> 'a2 -> 'a2 option)
   -> (bool -> kind -> ('a1, 'a3, 'a4, 'a5) tFormula -> ('a2, 'a3) cnf)
@@ -392,12 +392,16 @@ val mk_iff :
   -> ('a2, 'a3) cnf
 
 val is_bool : kind -> ('a1, 'a2, 'a3, 'a4) tFormula -> bool option
+val is_FF : kind -> ('a1, 'a2, 'a3, 'a4) tFormula -> bool
+
+val negate_formula :
+  kind -> ('a1, 'a2, 'a3, 'a4) tFormula -> ('a1, 'a3, 'a2, 'a4) gFormula
 
 val xcnf :
      ('a2 -> bool)
   -> ('a2 -> 'a2 -> 'a2 option)
-  -> ('a1 -> 'a3 -> ('a2, 'a3) cnf)
-  -> ('a1 -> 'a3 -> ('a2, 'a3) cnf)
+  -> (kind -> 'a1 -> 'a3 -> ('a2, 'a3) cnf)
+  -> (kind -> 'a1 -> 'a3 -> ('a2, 'a3) cnf)
   -> bool
   -> kind
   -> ('a1, 'a3, 'a4, 'a5) tFormula
@@ -447,6 +451,14 @@ val ror_cnf_opt :
 
 val ratom : ('a1, 'a2) cnf -> 'a2 -> ('a1, 'a2) cnf * 'a2 list
 
+val rxcnf_and_cnf :
+     ('a1 -> bool)
+  -> ('a1 -> 'a1 -> 'a1 option)
+  -> bool
+  -> ('a1, 'a2) cnf * 'a2 list
+  -> ('a1, 'a2) cnf * 'a2 list
+  -> ('a1, 'a2) cnf * 'a2 list
+
 val rxcnf_and :
      ('a2 -> bool)
   -> ('a2 -> 'a2 -> 'a2 option)
@@ -486,7 +498,7 @@ val rxcnf_impl :
   -> ('a1, 'a3, 'a4, 'a5) tFormula
   -> ('a2, 'a3) cnf * 'a3 list
 
-val rxcnf_iff :
+val rxcnf_eq :
      ('a2 -> bool)
   -> ('a2 -> 'a2 -> 'a2 option)
   -> (   bool
@@ -502,8 +514,8 @@ val rxcnf_iff :
 val rxcnf :
      ('a2 -> bool)
   -> ('a2 -> 'a2 -> 'a2 option)
-  -> ('a1 -> 'a3 -> ('a2, 'a3) cnf)
-  -> ('a1 -> 'a3 -> ('a2, 'a3) cnf)
+  -> (kind -> 'a1 -> 'a3 -> ('a2, 'a3) cnf)
+  -> (kind -> 'a1 -> 'a3 -> ('a2, 'a3) cnf)
   -> bool
   -> kind
   -> ('a1, 'a3, 'a4, 'a5) tFormula
@@ -609,13 +621,11 @@ val or_is_X :
   kind -> ('a1, 'a2, 'a3, 'a4) tFormula -> ('a1, 'a2, 'a3, 'a4) tFormula -> bool
 
 val abs_iff :
-     ('a1, 'a2, 'a3) to_constrT
-  -> kind
+     kind
   -> ('a1, 'a2, 'a3, 'a4) tFormula
   -> ('a1, 'a2, 'a3, 'a4) tFormula
   -> ('a1, 'a2, 'a3, 'a4) tFormula
   -> ('a1, 'a2, 'a3, 'a4) tFormula
-  -> kind
   -> ('a1, 'a2, 'a3, 'a4) tFormula
   -> ('a1, 'a2, 'a3, 'a4) tFormula
 
@@ -629,6 +639,17 @@ val abst_iff :
   -> bool
   -> kind
   -> ('a1, 'a2, 'a3, 'a4) tFormula
+  -> ('a1, 'a2, 'a3, 'a4) tFormula
+  -> ('a1, 'a2, 'a3, 'a4) tFormula
+
+val abs_eq :
+     ('a1, 'a2, 'a3) to_constrT
+  -> kind
+  -> ('a1, 'a2, 'a3, 'a4) tFormula
+  -> ('a1, 'a2, 'a3, 'a4) tFormula
+  -> ('a1, 'a2, 'a3, 'a4) tFormula
+  -> ('a1, 'a2, 'a3, 'a4) tFormula
+  -> kind
   -> ('a1, 'a2, 'a3, 'a4) tFormula
   -> ('a1, 'a2, 'a3, 'a4) tFormula
 
@@ -658,8 +679,8 @@ val cnf_checker :
 val tauto_checker :
      ('a2 -> bool)
   -> ('a2 -> 'a2 -> 'a2 option)
-  -> ('a1 -> 'a3 -> ('a2, 'a3) cnf)
-  -> ('a1 -> 'a3 -> ('a2, 'a3) cnf)
+  -> (kind -> 'a1 -> 'a3 -> ('a2, 'a3) cnf)
+  -> (kind -> 'a1 -> 'a3 -> ('a2, 'a3) cnf)
   -> (('a2 * 'a3) list -> 'a4 -> bool)
   -> ('a1, rtyp, 'a3, unit0) gFormula
   -> 'a4 list
@@ -867,9 +888,9 @@ val zdeduce : z nFormula -> z nFormula -> z nFormula option
 val xnnormalise : z formula -> z nFormula
 val xnormalise0 : z nFormula -> z nFormula list
 val cnf_of_list0 : 'a1 -> z nFormula list -> (z nFormula * 'a1) list list
-val normalise0 : z formula -> 'a1 -> (z nFormula, 'a1) cnf
+val normalise0 : kind -> z formula -> 'a1 -> (z nFormula, 'a1) cnf
 val xnegate0 : z nFormula -> z nFormula list
-val negate : z formula -> 'a1 -> (z nFormula, 'a1) cnf
+val negate : kind -> z formula -> 'a1 -> (z nFormula, 'a1) cnf
 
 val cnfZ :
      kind
@@ -904,14 +925,15 @@ val zTautoChecker : z formula bFormula -> zArithProof list -> bool
 type qWitness = q psatz
 
 val qWeakChecker : q nFormula list -> q psatz -> bool
-val qnormalise : q formula -> 'a1 -> (q nFormula, 'a1) cnf
-val qnegate : q formula -> 'a1 -> (q nFormula, 'a1) cnf
+val qnormalise : kind -> q formula -> 'a1 -> (q nFormula, 'a1) cnf
+val qnegate : kind -> q formula -> 'a1 -> (q nFormula, 'a1) cnf
 val qunsat : q nFormula -> bool
 val qdeduce : q nFormula -> q nFormula -> q nFormula option
 val normQ : q pExpr -> q pol
 
 val cnfQ :
      kind
+  -> bool
   -> (q formula, 'a1, 'a2, 'a3) tFormula
   -> (q nFormula, 'a1) cnf * 'a1 list
 
@@ -936,7 +958,9 @@ type rWitness = q psatz
 
 val rWeakChecker : q nFormula list -> q psatz -> bool
 val rnormalise : q formula -> 'a1 -> (q nFormula, 'a1) cnf
+val rnormalise_kind : kind -> q formula -> 'a1 -> (q nFormula, 'a1) cnf
 val rnegate : q formula -> 'a1 -> (q nFormula, 'a1) cnf
+val rnegate_kind : kind -> q formula -> 'a1 -> (q nFormula, 'a1) cnf
 val runsat : q nFormula -> bool
 val rdeduce : q nFormula -> q nFormula -> q nFormula option
 val rTautoChecker : rcst formula bFormula -> rWitness list -> bool

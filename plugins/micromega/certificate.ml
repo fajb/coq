@@ -495,7 +495,9 @@ let nlinear_prover prfdepth sys =
   let sys2 = saturate_by_linear_equalities sys1 in
   let sys = nlinear_preprocess sys1 @ sys2 in
   let bnd = bound_monomials sys in
-  let sys = List.map (fun ((p, o), prf) -> (cstr_of_poly (p, o), prf)) (bnd@sys) in
+  let sys =
+    List.map (fun ((p, o), prf) -> (cstr_of_poly (p, o), prf)) (bnd @ sys)
+  in
   let id =
     List.fold_left
       (fun acc (_, r) -> max acc (ProofFormat.pr_rule_max_id r))
@@ -508,6 +510,11 @@ let nlinear_prover prfdepth sys =
 
 let linear_prover_with_cert prfdepth sys =
   let sys = develop_constraints prfdepth q_spec sys in
+  if debug then begin
+    Printf.fprintf stdout "Input problem\n";
+    List.iter (fun s -> Printf.fprintf stdout "%a\n" WithProof.output s) sys;
+    Printf.fprintf stdout "Input problem\n"
+  end;
   (*  let sys = nlinear_preprocess  sys in *)
   let sys = List.map (fun (c, p) -> (cstr_of_poly c, p)) sys in
   match linear_prover_cstr sys with

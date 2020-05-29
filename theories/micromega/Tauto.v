@@ -452,7 +452,7 @@ Section S.
       (if pol then or_cnf_opt else and_cnf_opt) (REC (negb pol) f1) (REC pol f2).
 
 
-    Definition mk_iff (k: kind) (pol:bool) (f1 f2: TFormula TX AF k):=
+    Definition mk_eq (k: kind) (pol:bool) (f1 f2: TFormula TX AF k):=
       or_cnf_opt (and_cnf_opt (REC (negb pol) f1) (REC false f2))
                  (and_cnf_opt (REC pol f1) (REC true f2)).
 
@@ -473,6 +473,44 @@ Section S.
     destruct f ; inversion H; reflexivity.
   Qed.
 
+  Definition is_FF {TX : kind -> Type} {AF: Type} (k: kind) (f : TFormula TX AF k) :=
+    match f with
+    | FF _ => true
+    | _  =>  false
+    end.
+
+  Fixpoint negate_formula {TX : kind -> Type} {AF: Type} (k: kind) (f : TFormula TX AF k)  {struct f} :=
+    match f with
+    | TT _ => FF _
+    | FF _ => TT _
+    | A _ _ _ => TT _
+    | NOT e => e
+    | AND f1 f2 => OR (negate_formula f1) (negate_formula f2)
+    | OR  f1 f2 => negate_formula f1 (* a bit stupid *)
+    | IMPL f1 a f2 => if is_FF  f2 then f1
+                      else AND f1  (negate_formula f2)
+    (*don't care about those *)
+    | IFF f1 f2  => TT _
+    | EQ _ _     => TT _
+    | X _ _       => TT _
+    end.
+
+  Fixpoint forget_X {TX: kind -> Type} {AF: Type} (pol:bool) (k:kind) (f: TFormula TX AF k) {struct f} :=
+    match f with
+    | TT _ => TT _
+    | FF _ => FF _
+    | A x y z => A x y z
+    | X  _ _  => if pol then FF _ else TT _
+    | NOT e => NOT (forget_X (negb pol) e)
+    | AND f1 f2 => AND (forget_X pol f1) (forget_X pol f2)
+    | OR f1 f2  => OR (forget_X pol f1) (forget_X pol f2)
+    | IMPL e1 o e2 => IMPL (forget_X (negb pol) e1) o (forget_X pol e2)
+    | IFF e1 e2 => AND
+                     (IMPL (forget_X (negb pol) e1) None (forget_X pol e2))
+                     (IMPL (forget_X (negb pol) e2) None (forget_X pol e1))
+    | EQ e1 e2  => EQ e1 e2
+    end.
+
 
   Fixpoint xcnf {TX : kind -> Type} {AF: Type} (pol : bool) (k: kind) (f : TFormula TX AF k)  {struct f}: cnf :=
     match f with
@@ -484,14 +522,13 @@ Section S.
     | AND e1 e2 => mk_and xcnf pol e1 e2
     | OR e1 e2  => mk_or xcnf pol e1 e2
     | IMPL e1 _ e2 => mk_impl xcnf pol e1 e2
-    | IFF e1 e2 => match is_bool e2 with
-                   | Some isb => xcnf (if isb then pol else negb pol) e1
-                   | None  => mk_iff xcnf pol e1 e2
-                   end
+    | IFF e1 e2 => (if pol then and_cnf_opt else or_cnf_opt)
+                     (mk_impl xcnf pol e1 e2)
+                     (mk_impl xcnf pol e2 e1)
     | EQ e1 e2 =>
       match is_bool e2 with
       | Some isb => xcnf (if isb then pol else negb pol) e1
-      | None  => mk_iff xcnf pol e1 e2
+      | None  => mk_eq xcnf pol e1 e2
       end
     end.
 
@@ -588,21 +625,21 @@ Section S.
 
       Variable RXCNF : forall (polarity: bool) (k: kind) (f: TFormula TX AF k) , cnf * list Annot.
 
-      Definition rxcnf_and (polarity:bool) (k: kind) (e1 e2 : TFormula TX AF k) :=
-        let '(e1,t1) := RXCNF polarity e1 in
-        let '(e2,t2) := RXCNF polarity e2 in
+      Definition rxcnf_and_cnf (polarity:bool) (c1 c2: cnf * list Annot) :=
+        let (e1,t1) := c1 in
+        let (e2,t2) := c2 in
         if polarity
         then  (and_cnf_opt e1  e2, t1 +++ t2)
         else let (f',t') := ror_cnf_opt e1 e2 in
              (f', t1 +++ t2 +++ t').
 
+
+
+      Definition rxcnf_and (polarity:bool) (k: kind) (e1 e2 : TFormula TX AF k) :=
+        rxcnf_and_cnf polarity (RXCNF polarity e1) (RXCNF polarity e2).
+
       Definition rxcnf_or (polarity:bool) (k: kind) (e1 e2 : TFormula TX AF k) :=
-        let '(e1,t1) := RXCNF polarity e1 in
-        let '(e2,t2) := RXCNF polarity e2 in
-        if polarity
-        then let (f',t') := ror_cnf_opt e1 e2 in
-             (f', t1 +++ t2 +++ t')
-        else (and_cnf_opt e1 e2, t1 +++ t2).
+        rxcnf_and_cnf (negb polarity) (RXCNF polarity e1) (RXCNF polarity e2).
 
       Definition rxcnf_impl (polarity:bool) (k: kind) (e1 e2 : TFormula TX AF k) :=
         let '(e1 , t1) := (RXCNF (negb polarity) e1) in
@@ -619,7 +656,7 @@ Section S.
           let '(e2 , t2) := (RXCNF polarity e2) in
           (and_cnf_opt e1 e2, t1 +++ t2).
 
-      Definition rxcnf_iff (polarity:bool) (k: kind) (e1 e2 : TFormula TX AF k) :=
+      Definition rxcnf_eq (polarity:bool) (k: kind) (e1 e2 : TFormula TX AF k) :=
         let '(c1,t1) := RXCNF (negb polarity) e1 in
         let '(c2,t2) := RXCNF false e2 in
         let '(c3,t3) := RXCNF polarity e1 in
@@ -641,8 +678,9 @@ Section S.
       | AND e1 e2 => rxcnf_and rxcnf polarity e1 e2
       | OR e1 e2  => rxcnf_or rxcnf polarity e1 e2
       | IMPL e1 a e2 => rxcnf_impl rxcnf polarity e1 e2
-      | IFF e1 e2 => rxcnf_iff rxcnf polarity e1 e2
-      | EQ e1 e2  => rxcnf_iff rxcnf polarity e1 e2
+      | IFF e1 e2 => rxcnf_and_cnf polarity (rxcnf_impl rxcnf polarity e1 e2)
+                                   (rxcnf_impl rxcnf polarity e2 e1)
+      | EQ e1 e2  => rxcnf_eq rxcnf polarity e1 e2
       end.
 
     Section Abstraction.
@@ -755,17 +793,21 @@ Section S.
           |  _ , _     => false
           end.
 
-        Definition abs_iff  (k: kind) (nf1  ff2 f1 tf2 : TFormula TX AF k) (r: kind) (def : TFormula TX AF r) : TFormula TX AF r :=
+        Definition abs_iff (k:kind) (nf1 f2 f1 nf2 : TFormula TX AF k) (def: TFormula TX AF k) :=
+          def.
+
+        Definition abst_iff (pol : bool) (k: kind) (f1 f2: TFormula TX AF k) : TFormula TX AF k :=
+          abs_iff   (REC (negb pol) f1) (REC false f2) (REC pol f1) (REC true f2) (IFF (abst_simpl f1) (abst_simpl f2)).
+
+
+        Definition abs_eq  (k: kind) (nf1  ff2 f1 tf2 : TFormula TX AF k) (r: kind) (def : TFormula TX AF r) : TFormula TX AF r :=
           if andb (or_is_X nf1 ff2) (or_is_X f1 tf2)
           then X r (aformula def)
           else def.
 
 
-        Definition abst_iff (pol : bool) (k: kind) (f1 f2: TFormula TX AF k) : TFormula TX AF k :=
-          abs_iff   (REC (negb pol) f1) (REC false f2) (REC pol f1) (REC true f2) (IFF (abst_simpl f1) (abst_simpl f2)).
-
         Definition abst_eq (pol : bool)  (f1 f2: TFormula TX AF isBool) : TFormula TX AF isProp :=
-          abs_iff   (REC (negb pol) f1) (REC false f2) (REC pol f1) (REC true f2) (EQ (abst_simpl f1) (abst_simpl f2)).
+          abs_eq   (REC (negb pol) f1) (REC false f2) (REC pol f1) (REC true f2) (EQ (abst_simpl f1) (abst_simpl f2)).
 
       End REC.
 
@@ -960,14 +1002,12 @@ Section S.
           xcnf pol f = xcnf pol (abst_simpl f).
       Proof.
         induction f; simpl;intros;
-          unfold mk_and,mk_or,mk_impl, mk_iff;
+          unfold mk_and,mk_or,mk_impl, mk_eq;
           rewrite <- ?IHf;
           try (rewrite <- !IHf1; rewrite <- !IHf2);
           try reflexivity.
         - rewrite needA_all.
           reflexivity.
-        - rewrite is_bool_abst_simpl.
-          destruct (is_bool f2); auto.
         - rewrite is_bool_abst_simpl.
           destruct (is_bool f2); auto.
       Qed.
@@ -1002,38 +1042,37 @@ Section S.
         congruence.
       Qed.
 
-      Lemma mk_iff_is_bool : forall (k: kind) (f1 f2:TFormula TX AF k) pol,
+      Lemma mk_eq_is_bool : forall (k: kind) (f1 f2:TFormula TX AF k) pol,
           match is_bool f2 with
           | Some isb => xcnf (if isb then pol else negb pol) f1
-          | None => mk_iff xcnf pol f1 f2
-          end = mk_iff xcnf pol f1 f2.
+          | None => mk_eq xcnf pol f1 f2
+          end = mk_eq xcnf pol f1 f2.
       Proof.
         intros.
         destruct (is_bool f2) eqn:EQ; auto.
         apply is_bool_inv in EQ.
         subst.
-        unfold mk_iff.
+        unfold mk_eq.
         destruct b ; simpl; cnf_simpl; reflexivity.
       Qed.
 
-      Lemma abst_iff_correct : forall
-          (k: kind)
-          (f1 f2 : GFormula k)
+      Lemma abst_eq_correct : forall
+          (f1 f2 : GFormula isBool)
           (IHf1 : forall pol : bool, xcnf pol f1 = xcnf pol (abst_form pol f1))
           (IHf2 : forall pol : bool, xcnf pol f2 = xcnf pol (abst_form pol f2))
           (pol : bool),
-          xcnf pol (IFF f1 f2) = xcnf pol (abst_iff abst_form pol f1 f2).
+          xcnf pol (EQ f1 f2) = xcnf pol (abst_eq abst_form pol f1 f2).
       Proof.
         intros; simpl.
-        assert (D1 :mk_iff xcnf pol f1 f2 = mk_iff xcnf pol (abst_simpl f1) (abst_simpl f2)).
+        assert (D1 :mk_eq xcnf pol f1 f2 = mk_eq xcnf pol (abst_simpl f1) (abst_simpl f2)).
         {
           simpl.
-          unfold mk_iff.
+          unfold mk_eq.
           rewrite <- !abst_simpl_correct.
           reflexivity.
         }
-        rewrite mk_iff_is_bool.
-        unfold abst_iff,abs_iff.
+        rewrite mk_eq_is_bool.
+        unfold abst_eq,abs_eq.
         destruct (      or_is_X (abst_form (negb pol) f1) (abst_form false f2) &&
                                 or_is_X (abst_form pol f1) (abst_form true f2)
                  ) eqn:EQ1.
@@ -1045,7 +1084,7 @@ Section S.
           destruct EQ1 as (b1 & EQ1).
           destruct EQ2 as (b2 & EQ2).
           rewrite if_same.
-          unfold mk_iff.
+          unfold mk_eq.
           rewrite !IHf1.
           rewrite !IHf2.
           destruct EQ1 as [EQ1 | EQ1] ; apply is_X_inv in EQ1;
@@ -1053,27 +1092,10 @@ Section S.
               rewrite EQ1; rewrite EQ2; simpl;
                 repeat rewrite if_same ; cnf_simpl; auto.
         + simpl.
-          rewrite mk_iff_is_bool.
-          unfold mk_iff.
+          rewrite mk_eq_is_bool.
+          unfold mk_eq.
           rewrite <- ! abst_simpl_correct.
           reflexivity.
-      Qed.
-
-      Lemma abst_eq_correct : forall
-          (f1 f2 : GFormula isBool)
-          (IHf1 : forall pol : bool, xcnf pol f1 = xcnf pol (abst_form pol f1))
-          (IHf2 : forall pol : bool, xcnf pol f2 = xcnf pol (abst_form pol f2))
-          (pol : bool),
-          xcnf pol (EQ f1 f2) = xcnf pol (abst_form pol (EQ f1 f2)).
-      Proof.
-        intros.
-        change (xcnf pol (IFF f1 f2) = xcnf pol (abst_form pol (EQ f1 f2))).
-        rewrite abst_iff_correct by assumption.
-        simpl. unfold abst_iff, abst_eq.
-        unfold abs_iff.
-        destruct (or_is_X (abst_form (negb pol) f1) (abst_form false f2) &&
-                          or_is_X (abst_form pol f1) (abst_form true f2)
-                 ) ; auto.
       Qed.
 
 
@@ -1166,7 +1188,13 @@ Section S.
                rewrite EQ1. simpl.
                congruence.
                congruence.
-        -  apply abst_iff_correct; auto.
+        - simpl.
+          unfold mk_impl.
+          destruct pol ; simpl ; auto.
+          repeat rewrite <- abst_simpl_correct.
+          tauto.
+          repeat rewrite <- abst_simpl_correct.
+          tauto.
         -  apply abst_eq_correct; auto.
       Qed.
 
@@ -1376,32 +1404,6 @@ Section S.
   Qed.
 
 
-
-
-  Lemma rxcnf_iff_xcnf :
-    forall {TX : kind -> Type} {AF:Type} (k: kind) (f1 f2:TFormula TX AF k)
-           (IHf1 : forall pol : bool, fst (rxcnf pol f1) = xcnf pol f1)
-           (IHf2 : forall pol : bool, fst (rxcnf pol f2) = xcnf pol f2),
-    forall pol : bool, fst (rxcnf_iff rxcnf pol f1 f2) = mk_iff xcnf pol f1 f2.
-  Proof.
-    intros.
-    unfold rxcnf_iff.
-    unfold mk_iff.
-    rewrite <- (IHf1 (negb pol)).
-    rewrite <- (IHf1 pol).
-    rewrite <- (IHf2 false).
-    rewrite <- (IHf2 true).
-    destruct (rxcnf (negb pol) f1).
-    destruct (rxcnf false f2).
-    destruct (rxcnf pol f1).
-    destruct (rxcnf true f2).
-    destruct (ror_cnf_opt (and_cnf_opt c c0) (and_cnf_opt c1 c2)) eqn:EQ.
-    simpl.
-    change c3 with (fst (c3,l3)).
-    rewrite <- EQ. rewrite ror_opt_cnf_cnf.
-    reflexivity.
-  Qed.
-
   Lemma rxcnf_xcnf : forall {TX : kind -> Type} {AF:Type} (k: kind) (f:TFormula TX AF k) pol,
       fst (rxcnf  pol f) = xcnf pol f.
   Proof.
@@ -1414,17 +1416,32 @@ Section S.
     - apply rxcnf_or_xcnf; auto.
     - apply rxcnf_impl_xcnf; auto.
     - intros.
-      rewrite mk_iff_is_bool.
-      apply rxcnf_iff_xcnf; auto.
+      rewrite <- rxcnf_impl_xcnf; auto.
+      rewrite <- rxcnf_impl_xcnf; auto.
+      unfold rxcnf_and_cnf.
+      destruct (rxcnf_impl rxcnf pol f1 f2).
+      destruct (rxcnf_impl rxcnf pol f2 f1).
+      destruct pol ; auto.
+      rewrite <- ror_opt_cnf_cnf.
+      simpl.
+      destruct (ror_cnf_opt c c0); auto.
     - intros.
-      rewrite mk_iff_is_bool.
-      apply rxcnf_iff_xcnf; auto.
+      rewrite mk_eq_is_bool.
+      unfold mk_eq.
+      unfold rxcnf_eq.
+      repeat rewrite <- IHf1.
+      repeat rewrite <- IHf2.
+      destruct (rxcnf (negb pol) f1).
+      destruct (rxcnf false f2).
+      destruct (rxcnf pol f1).
+      destruct (rxcnf true f2).
+      rewrite <- ror_opt_cnf_cnf.
+      simpl.
+      destruct (ror_cnf_opt (and_cnf_opt c c0) (and_cnf_opt c1 c2)); auto.
   Qed.
 
 
   Variable eval'  : Env -> Term' -> Prop.
-
-  Variable no_middle_eval' : forall env d, (eval' env d) \/ ~ (eval' env d).
 
   Variable unsat_prop : forall t, unsat t  = true ->
                                   forall env, eval' env t -> False.
@@ -1546,23 +1563,14 @@ Section S.
   Qed.
 
 
-  Lemma no_middle_eval_tt : forall env a,
-      eval_tt env a \/ ~ eval_tt env a.
-  Proof.
-    unfold eval_tt.
-    auto.
-  Qed.
-
-  Hint Resolve no_middle_eval_tt : tauto.
-
-  Lemma or_clause_correct : forall cl cl' env,  eval_opt_clause env (or_clause cl cl') <-> eval_clause env cl \/ eval_clause env cl'.
+  Lemma or_clause_correct : forall cl cl' env,  (eval_opt_clause env (or_clause cl cl') -> False) <->
+                                                ((eval_clause env cl \/ eval_clause env cl') -> False).
   Proof.
     induction cl.
     - simpl. unfold eval_clause at 2.  simpl. tauto.
     - intros *.
       simpl.
       assert (HH := add_term_correct env a cl').
-      assert (eval_tt env a \/ ~ eval_tt env a) by (apply no_middle_eval').
       destruct (add_term a cl'); simpl in *.
       +
         rewrite IHcl.
@@ -1574,8 +1582,9 @@ Section S.
         tauto.
   Qed.
 
-
-  Lemma or_clause_cnf_correct : forall env t f, eval_cnf env (or_clause_cnf t f) <-> (eval_clause env t) \/ (eval_cnf env f).
+  Lemma or_clause_cnf_correct : forall env t f,
+      (eval_cnf env (or_clause_cnf t f) -> False) <->
+      (((eval_clause env t) \/ (eval_cnf env f)) -> False).
   Proof.
     unfold eval_cnf.
     unfold or_clause_cnf.
@@ -1586,7 +1595,8 @@ Section S.
                  | None => acc
                  end)).
     intro f.
-    assert (  make_conj (eval_clause env) (fold_left F f nil) <-> (eval_clause env t \/ make_conj (eval_clause env) f) /\ make_conj (eval_clause env) nil).
+    assert (  (make_conj (eval_clause env) (fold_left F f nil) -> False) <->
+              ((((eval_clause env t \/ make_conj (eval_clause env) f) /\ make_conj (eval_clause env) nil)) -> False)).
     {
       generalize (@nil clause) as acc.
       induction f.
@@ -1631,8 +1641,7 @@ Section S.
     tauto.
   Qed.
 
-
-  Lemma or_cnf_correct : forall env f f', eval_cnf env (or_cnf f f') <-> (eval_cnf env  f) \/ (eval_cnf  env f').
+  Lemma or_cnf_correct : forall env f f', (eval_cnf env (or_cnf f f') -> False) <-> (((eval_cnf env  f) \/ (eval_cnf  env f')) -> False).
   Proof.
     induction f.
     unfold eval_cnf.
@@ -1643,13 +1652,12 @@ Section S.
     simpl.
     rewrite eval_cnf_app.
     rewrite <- eval_cnf_cons_iff.
-    rewrite IHf.
-    rewrite or_clause_cnf_correct.
-    unfold eval_clause.
+    generalize (IHf f').
+    generalize (or_clause_cnf_correct env a f').
     tauto.
   Qed.
 
-  Lemma or_cnf_opt_correct : forall env f f', eval_cnf env (or_cnf_opt f f') <-> eval_cnf env (or_cnf f f').
+  Lemma or_cnf_opt_correct : forall env f f', (eval_cnf env (or_cnf_opt f f') -> False) <-> (eval_cnf env (or_cnf f f') -> False).
   Proof.
     unfold or_cnf_opt.
     intros.
@@ -1657,7 +1665,7 @@ Section S.
     { simpl.
       apply is_cnf_tt_inv in TF.
       subst.
-      rewrite or_cnf_correct.
+      rewrite (or_cnf_correct env cnf_tt f').
       rewrite eval_cnf_tt.
       tauto.
     }
@@ -1666,7 +1674,7 @@ Section S.
       apply is_cnf_tt_inv in TF'.
       subst.
       rewrite or_cnf_correct.
-      rewrite eval_cnf_tt.
+      rewrite! eval_cnf_tt.
       tauto.
     }
     { simpl.
@@ -1688,20 +1696,22 @@ Section S.
 
   Definition e_rtyp (k: kind) (x : rtyp k) : rtyp k := x.
 
-  Lemma hold_eTT : forall k, hold k (eTT k).
+  Lemma hold_eTT : forall k, hold k (eTT k) <-> True.
   Proof.
-    destruct k ; simpl; auto.
+    destruct k ; simpl.
+    tauto. unfold is_true. tauto.
   Qed.
 
   Hint Resolve hold_eTT : tauto.
 
   Lemma hold_eFF : forall k,
-      hold k (eNOT k (eFF k)).
+      hold k  (eFF k) <-> False.
   Proof.
-    destruct k ; simpl;auto.
+    destruct k ; simpl.
+    tauto. unfold is_true.
+    intuition congruence.
   Qed.
 
-  Hint Resolve hold_eFF : tauto.
 
   Lemma hold_eAND : forall k r1 r2,
       hold k (eAND k r1 r2) <-> (hold k r1 /\ hold k r2).
@@ -1750,7 +1760,52 @@ Section S.
       destruct e1,e2 ; simpl ; intuition congruence.
   Qed.
 
+  Lemma holdeNOTeTT : forall k, hold k (eNOT k (eTT k)) -> False.
+  Proof.
+    intros.
+    rewrite hold_eNOT in H.
+    rewrite hold_eTT in H.
+    tauto.
+  Qed.
 
+  Lemma negate_form_correct : forall (k: kind) (env: Env) (f : GFormula  k) ,
+      hold k (eval_f e_rtyp (eval env) (NOT (negate_formula f))) ->
+      hold k (eval_f (AF:=unit) e_rtyp (eval env) f).
+  Proof.
+    induction f ; simpl; intros.
+    - rewrite hold_eTT. tauto.
+    - apply holdeNOTeTT in H.
+      tauto.
+    - apply holdeNOTeTT in H.
+      tauto.
+    - apply holdeNOTeTT in H.
+      tauto.
+    -
+      simpl in *.
+      rewrite hold_eAND.
+      rewrite hold_eNOT in *.
+      rewrite hold_eOR in H.
+      tauto.
+    -
+      simpl in *.
+      rewrite hold_eOR in *.
+      rewrite hold_eNOT in *.
+      tauto.
+    - simpl in *.
+      rewrite hold_eNOT in *.
+      tauto.
+    - simpl in *.
+      rewrite hold_eNOT in *.
+      rewrite hold_eIMPL in *.
+      destruct (is_FF f2) eqn:EQ.
+      destruct f2 ; simpl in EQ ; try congruence.
+      simpl in H.
+      rewrite hold_eAND in H.
+      tauto.
+    - apply holdeNOTeTT in H.
+      tauto.
+    - tauto.
+  Qed.
 
   Lemma xcnf_impl :
     forall
@@ -1760,28 +1815,32 @@ Section S.
       (f2 : GFormula k)
       (IHf1 : forall (pol : bool) (env : Env),
           eval_cnf env (xcnf pol f1) ->
-          hold k (eval_f e_rtyp (eval env) (if pol then f1 else NOT f1)))
+          hold k (eval_f e_rtyp (eval env) (if pol then NOT (NOT f1) else NOT f1)))
       (IHf2 : forall (pol : bool) (env : Env),
           eval_cnf env (xcnf pol f2) ->
-          hold k (eval_f e_rtyp (eval env) (if pol then f2 else NOT f2))),
+          hold k (eval_f e_rtyp (eval env) (if pol then NOT (NOT f2) else NOT f2))),
     forall (pol : bool) (env : Env),
       eval_cnf env (xcnf pol (IMPL f1 o f2)) ->
-      hold k (eval_f e_rtyp (eval env) (if pol then IMPL f1 o f2 else NOT (IMPL f1 o f2))).
+      hold k (eval_f e_rtyp (eval env) (if pol then NOT (NOT (IMPL f1 o f2)) else NOT (IMPL f1 o f2))).
   Proof.
     simpl; intros. unfold mk_impl in H.
     destruct pol.
     + simpl.
+      rewrite! hold_eNOT.
       rewrite hold_eIMPL.
       intro.
-      rewrite or_cnf_opt_correct in H.
-      rewrite or_cnf_correct in H.
-      destruct H as [H | H].
+      revert H.
+      rewrite or_cnf_opt_correct.
+      rewrite or_cnf_correct.
+      intro H ; destruct H as [H | H].
       generalize (IHf1 _ _ H).
       simpl in *.
       rewrite hold_eNOT.
       tauto.
       generalize (IHf2 _ _ H).
-      auto.
+      simpl.
+      rewrite !hold_eNOT.
+      tauto.
     + (* pol = false *)
       rewrite eval_cnf_and_opt in H.
       unfold and_cnf in H.
@@ -1795,6 +1854,7 @@ Section S.
       rewrite ! hold_eIMPL.
       tauto.
   Qed.
+
 
   Lemma hold_eIFF_IMPL : forall k e1 e2,
       hold k (eIFF k e1 e2) <-> (hold k (eAND k (eIMPL k e1 e2) (eIMPL k e2 e1))).
@@ -1813,60 +1873,84 @@ Section S.
     destruct e1,e2 ; simpl ; intuition congruence.
   Qed.
 
+  Lemma lift_if : forall {A B: Type} (F : A -> B) (b: bool) x y,
+      (if b then F x else F y) = F (if b then x else y).
+  Proof.
+    destruct b; auto.
+  Qed.
 
-  Lemma xcnf_iff : forall
-      (k : kind)
-      (f1 f2 : @GFormula Term rtyp Annot unit k)
+  Lemma is_true_negb : forall b,
+      is_true (negb b) <-> ~ is_true b.
+  Proof.
+    destruct b ; unfold is_true ; simpl.
+    intuition congruence.
+    intuition congruence.
+  Qed.
+
+  Lemma xcnf_eq : forall
+      (f1 f2 : @GFormula Term rtyp Annot unit isBool)
       (IHf1 : forall (pol : bool) (env : Env),
           eval_cnf env (xcnf pol f1) ->
-          hold k (eval_f e_rtyp (eval env) (if pol then f1 else NOT f1)))
+          hold isBool (eval_f e_rtyp (eval env) (if pol then NOT (NOT f1) else NOT f1)))
       (IHf2 : forall (pol : bool) (env : Env),
           eval_cnf env (xcnf pol f2) ->
-          hold k (eval_f e_rtyp (eval env) (if pol then f2 else NOT f2))),
+          hold isBool (eval_f e_rtyp (eval env) (if pol then NOT (NOT f2) else NOT f2))),
       forall (pol : bool) (env : Env),
-        eval_cnf env (xcnf pol (IFF f1 f2)) ->
-        hold k (eval_f e_rtyp (eval env) (if pol then IFF f1 f2 else NOT (IFF f1 f2))).
+        eval_cnf env (xcnf pol (EQ f1 f2)) ->
+        hold isProp (eval_f e_rtyp (eval env) (if pol then NOT (NOT (EQ f1 f2)) else NOT (EQ f1 f2))).
   Proof.
     simpl.
     intros.
-    rewrite mk_iff_is_bool in H.
-    unfold mk_iff in H.
-    destruct pol;
-      rewrite or_cnf_opt_correct in H;
-      rewrite or_cnf_correct in H;
-      rewrite! eval_cnf_and_opt in H;
-      unfold and_cnf in H;
-      rewrite! eval_cnf_app in H;
-      generalize (IHf1 false env);
-      generalize (IHf1 true env);
-      generalize (IHf2 false env);
-      generalize (IHf2 true env);
-      simpl.
+    rewrite mk_eq_is_bool in H.
+    unfold mk_eq in H.
+    rewrite lift_if.
+    simpl.
+    intro.
+    revert H.
+    rewrite or_cnf_opt_correct.
+    rewrite or_cnf_correct.
+    rewrite! eval_cnf_and_opt.
+    unfold and_cnf.
+    rewrite! eval_cnf_app.
+    generalize (IHf1 false env).
+    generalize (IHf1 true env).
+    generalize (IHf2 false env).
+    generalize (IHf2 true env).
+    simpl.
+    rewrite! negb_involutive.
+    rewrite! is_true_negb.
+    unfold is_true.
+    destruct pol; simpl in *.
     -
-      rewrite hold_eIFF_IMPL.
-      rewrite hold_eAND.
-      rewrite! hold_eIMPL.
-      rewrite! hold_eNOT.
-      tauto.
-    -  rewrite! hold_eNOT.
-       rewrite hold_eIFF_IMPL.
-       rewrite hold_eAND.
-       rewrite! hold_eIMPL.
-       tauto.
+      destruct (eval_f e_rtyp (eval env) f2);
+        destruct (eval_f e_rtyp (eval env) f1);
+        intuition try congruence.
+    -       destruct (eval_f e_rtyp (eval env) f2);
+        destruct (eval_f e_rtyp (eval env) f1);
+        intuition try congruence.
   Qed.
 
+  Lemma xcnf_iff : forall pol (k: kind) (f1 f2 : @GFormula Term rtyp Annot unit k),
+      xcnf pol (IFF f1 f2) =
+      (if pol then and_cnf_opt else or_cnf_opt)
+        (mk_impl xcnf pol f1 f2)
+        (mk_impl xcnf pol f2 f1).
+  Proof. reflexivity. Qed.
+
   Lemma xcnf_correct : forall (k: kind) (f : @GFormula Term rtyp Annot unit k)  pol env,
-      eval_cnf env (xcnf pol f) -> hold k (eval_f e_rtyp (eval env) (if pol then f else NOT f)).
+      eval_cnf env (xcnf pol f) -> hold k (eval_f e_rtyp (eval env) (if pol then (NOT (NOT f)) else NOT f)).
   Proof.
     induction f.
     - (* TT *)
       unfold eval_cnf.
       simpl.
       destruct pol ; intros; simpl; auto with tauto.
+      rewrite! hold_eNOT. rewrite hold_eTT. tauto.
       rewrite eval_cnf_ff in H. tauto.
     - (* FF *)
-      destruct pol ; simpl in *; intros; auto with tauto.
+      destruct pol ; simpl in *; intros.
       + rewrite eval_cnf_ff in H. tauto.
+      + rewrite hold_eNOT. rewrite hold_eFF. tauto.
     - (* P *)
       simpl.
       destruct pol ; intros ;simpl.
@@ -1875,11 +1959,11 @@ Section S.
     - (* A *)
       simpl.
       destruct pol ; simpl.
-      intros.
-      eapply normalise_correct  ; eauto.
-      (* A 2 *)
-      intros.
-      eapply  negate_correct ; eauto.
+      + intros.
+        rewrite! hold_eNOT.
+        eapply normalise_correct in H ; eauto.
+      + intros.
+        eapply  negate_correct in H ; eauto.
     - (* AND *)
       destruct pol ; simpl.
       + (* pol = true *)
@@ -1888,15 +1972,20 @@ Section S.
         unfold and_cnf in H.
         rewrite eval_cnf_app  in H.
         destruct H.
-        apply hold_eAND; split.
-        apply (IHf1 _ _ H).
-        apply (IHf2 _ _ H0).
+        apply IHf1 in H.
+        apply IHf2 in H0.
+        simpl in H, H0.
+        rewrite! hold_eNOT in *.
+        rewrite hold_eAND.
+        tauto.
       +  (* pol = false *)
         intros.
-        apply hold_eNOT.
-        rewrite hold_eAND.
-        rewrite or_cnf_opt_correct in H.
-        rewrite or_cnf_correct in H.
+        rewrite hold_eNOT.
+        intro.
+        rewrite hold_eAND in H0.
+        revert H.
+        rewrite or_cnf_opt_correct.
+        rewrite or_cnf_correct. intro.
         destruct H as [H | H].
         generalize (IHf1 false  env H).
         simpl.
@@ -1911,17 +2000,22 @@ Section S.
       destruct pol.
       + (* pol = true *)
         intros. unfold mk_or in H.
-        rewrite or_cnf_opt_correct in H.
-        rewrite or_cnf_correct in H.
-        destruct H as [H | H].
-        generalize (IHf1 _  env H).
         simpl.
+        rewrite! hold_eNOT.
         rewrite hold_eOR.
-        tauto.
-        generalize (IHf2 _  env H).
+        intro.
+        revert H.
+        rewrite or_cnf_opt_correct.
+        rewrite or_cnf_correct.
+        intro H ; destruct H as [H | H].
+        * generalize (IHf1 _  env H).
         simpl.
-        rewrite hold_eOR.
+        rewrite! hold_eNOT.
         tauto.
+        * generalize (IHf2 _  env H).
+          simpl.
+          rewrite! hold_eNOT.
+          tauto.
       + (* pol = true *)
         intros. unfold mk_or in H.
         rewrite eval_cnf_and_opt in H.
@@ -1937,16 +2031,40 @@ Section S.
         tauto.
     - (**)
       simpl.
-      destruct pol ; simpl.
       intros.
-      apply (IHf false) ; auto.
-      intros.
-      generalize (IHf _ _ H).
-      rewrite ! hold_eNOT.
-      tauto.
+      apply IHf in H.
+      destruct pol ; simpl in * ;
+        rewrite! hold_eNOT in *.
+      tauto. tauto.
     - (* IMPL *)
       apply xcnf_impl; auto.
-    - apply xcnf_iff ; auto.
+    - intros.
+      rewrite xcnf_iff in H.
+      destruct pol.
+      + rewrite eval_cnf_and_opt in H.
+        unfold and_cnf in H.
+        rewrite eval_cnf_app in H.
+        destruct H as (H1 & H2).
+        apply xcnf_impl with (o:= None) in H1; auto.
+        apply xcnf_impl with (o:= None) in H2; auto.
+        simpl in *.
+        rewrite! hold_eNOT in *.
+        rewrite! hold_eIFF in *.
+        rewrite hold_eIMPL in *.
+        tauto.
+      + simpl.
+        rewrite hold_eNOT.
+        intro.
+        revert H.
+        rewrite or_cnf_opt_correct.
+        rewrite or_cnf_correct.
+        intros.
+        rewrite hold_eIFF in H0.
+        destruct H as [J|J] ; apply xcnf_impl with (o:= None) in J; auto.
+        simpl in J. rewrite hold_eNOT in J.
+        rewrite hold_eIMPL in J. tauto.
+        simpl in J. rewrite hold_eNOT in J.
+        rewrite hold_eIMPL in J. tauto.
     - simpl.
       destruct (is_bool f2) eqn:EQ.
       + apply is_bool_inv in EQ.
@@ -1954,26 +2072,21 @@ Section S.
           apply IHf1 in H;
           destruct pol ; simpl in * ; auto.
         * unfold is_true in H.
-          rewrite negb_true_iff in H.
+          rewrite negb_involutive in H.
           congruence.
         *
           unfold is_true in H.
           rewrite negb_true_iff in H.
           congruence.
         * unfold is_true in H.
+          rewrite negb_true_iff in H.
+          congruence.
+        * unfold is_true in H.
+          rewrite negb_involutive in H.
           congruence.
       + intros.
-        rewrite <- mk_iff_is_bool in H.
-        apply xcnf_iff in H; auto.
-        simpl in H.
-        destruct pol ; simpl in *.
-        rewrite <- hold_eEQ.
-        simpl; auto.
-        rewrite <- hold_eEQ.
-        simpl; auto.
-        unfold is_true in *.
-        rewrite negb_true_iff in H.
-        congruence.
+        rewrite <- mk_eq_is_bool in H.
+        apply xcnf_eq in H; auto.
   Qed.
 
   Variable Witness : Type.
@@ -2018,13 +2131,293 @@ Section S.
   Definition tauto_checker (f:@GFormula Term rtyp Annot unit isProp) (w:list Witness) : bool :=
     cnf_checker (xcnf true f) w.
 
+
+
+  Definition itauto_checker (f:@GFormula Term rtyp Annot unit isProp) (w:list Witness) : bool :=
+    cnf_checker (xcnf false (negate_formula f)) w.
+
+  Lemma itauto_checker_sound : forall t  w, itauto_checker t w = true -> forall env, eval_f e_rtyp (eval env)  t.
+  Proof.
+    unfold itauto_checker.
+    intros.
+    change (eval_f e_rtyp (eval env) t) with (eval_f e_rtyp (eval env) (if true then t else TT isProp)).
+    apply cnf_checker_sound with (env:=env) in H.
+    apply xcnf_correct in H.
+    apply negate_form_correct in H.
+    auto.
+  Qed.
+
+  Lemma mk_impl_tt : forall k (f : @GFormula Term rtyp Annot unit k),
+      mk_impl xcnf true f (TT k) = cnf_tt.
+  Proof.
+    unfold mk_impl.
+    simpl.
+    unfold or_cnf_opt.
+    intros.
+    rewrite orb_comm.
+    simpl. reflexivity.
+  Qed.
+
+  Lemma and_cnf_opt_cnf_tt_l : forall f,
+      and_cnf_opt cnf_tt f = f.
+  Proof.
+    unfold and_cnf_opt.
+    intro.
+    simpl.
+    destruct (is_cnf_ff f) eqn:EQ.
+    apply is_cnf_ff_inv in EQ. auto.
+    apply if_cnf_tt.
+  Qed.
+
+  Lemma or_cnf_opt_cnf_tt_r : forall f,
+      or_cnf_opt f cnf_tt = cnf_tt.
+  Proof.
+    unfold or_cnf_opt.
+    intro. rewrite orb_comm.
+    simpl. reflexivity.
+  Qed.
+
+  Lemma or_cnf_opt_cnf_tt_l : forall f,
+      or_cnf_opt cnf_tt f = cnf_tt.
+  Proof.
+    unfold or_cnf_opt.
+    intro. reflexivity.
+  Qed.
+
+
+  Lemma forget_X_same_cnf :
+    forall  (k: kind) (f : @GFormula Term rtyp Annot unit k)  pol ,
+      (xcnf pol f) = xcnf pol (forget_X pol f).
+  Proof.
+    induction f; simpl.
+    - auto.
+    - auto.
+    - destruct pol; auto.
+    - auto.
+    - intros.
+      unfold mk_and.
+      rewrite! IHf1.
+      rewrite! IHf2. reflexivity.
+    - intros.
+      unfold mk_or.
+      rewrite! IHf1.
+      rewrite! IHf2. reflexivity.
+    - auto.
+    - unfold mk_impl ; simpl.
+      intros.
+      rewrite !IHf1.
+      rewrite! IHf2. reflexivity.
+    -
+      unfold mk_and.
+      intro.
+      simpl.
+      unfold mk_impl.
+      repeat rewrite <- IHf1.
+      repeat rewrite <- IHf2.
+      destruct pol ; simpl ; auto.
+    - intros.
+      auto.
+  Qed.
+
+
+  Variable no_middle_eval : forall env d, (eval env isProp d) \/ ~ (eval env isProp d).
+
+  Lemma hold_forget_X_dec : forall k (env: Env) (f : GFormula k) b ,
+
+      hold k (eval_f e_rtyp (eval env) (forget_X b f)) \/
+      ~ hold k (eval_f (AF:= unit)e_rtyp (eval env) (forget_X b f)).
+  Proof.
+    induction f ; simpl ; intros; auto.
+    - rewrite hold_eTT.
+      tauto.
+    - rewrite hold_eFF.
+      tauto.
+    - destruct b ; simpl ; auto.
+      rewrite hold_eFF.
+      tauto.
+      rewrite hold_eTT.
+      tauto.
+    - destruct k.
+      apply no_middle_eval.
+      simpl.
+      destruct (eval env isBool t); unfold is_true ; intuition congruence.
+    - rewrite hold_eAND.
+      specialize (IHf1 b).
+      specialize (IHf2 b).
+      tauto.
+    - rewrite hold_eOR.
+      specialize (IHf1 b).
+      specialize (IHf2 b).
+      tauto.
+    - rewrite hold_eNOT.
+      specialize (IHf (negb b)).
+      tauto.
+    - rewrite hold_eIMPL.
+      specialize (IHf1 (negb b)).
+      specialize (IHf2 b).
+      tauto.
+    - rewrite hold_eAND.
+      rewrite! hold_eIMPL.
+      generalize (IHf1 (negb b)).
+      generalize (IHf1 b).
+      generalize (IHf2 (negb b)).
+      generalize (IHf2 b).
+      tauto.
+    - destruct (  eval_f e_rtyp (eval env) f1);
+        destruct (  eval_f e_rtyp (eval env) f2); intuition congruence.
+  Qed.
+
+  Hint Resolve hold_forget_X_dec : tauto.
+
+  Lemma not_and_dec : forall (A B: Prop),
+      A \/ ~ A -> B \/ ~B ->
+      ~ (A /\ B) -> ~ A \/ ~B.
+  Proof. tauto. Qed.
+
+  Lemma not_or_dec : forall (A B: Prop),
+      ~ (A \/ B) -> ~ A /\ ~B.
+  Proof. tauto. Qed.
+
+  Lemma not_not_dec : forall (A : Prop),
+      (A \/ ~ A) ->
+      ~ ~ A  -> A.
+  Proof. tauto. Qed.
+
+  Lemma impl_dec : forall (A B: Prop),
+      (A \/ ~ A) ->
+      (A -> B)  -> (~ A \/ B).
+  Proof. tauto. Qed.
+
+
+  Lemma impl_neg_dec : forall (A B: Prop),
+      (A \/ ~ A) ->
+      ~ (A -> B)  -> (A /\ ~ B).
+  Proof. tauto. Qed.
+
+
+
+  Lemma forget_X_weak : forall k (f : GFormula k) (pol:bool) (env:Env),
+      hold k (eval_f e_rtyp (eval env) (if pol then (forget_X pol f) else NOT (forget_X pol f))) ->
+      hold k (eval_f (AF:=unit) e_rtyp (eval env) (if pol then  f else NOT f)).
+  Proof.
+    induction f; simpl.
+    - intros.
+      auto.
+    - intros.
+      auto.
+    - intros.
+      destruct pol ; simpl in *.
+      + rewrite hold_eFF in H. tauto.
+      + rewrite hold_eNOT in *.
+        rewrite hold_eTT in H. tauto.
+    - auto.
+    - intros.
+      destruct pol ; simpl in *.
+      + rewrite hold_eAND in *.
+        destruct H as (H1 & H2).
+        apply (IHf1 true env) in H1.
+        apply (IHf2 true env) in H2.
+        tauto.
+      + rewrite hold_eNOT in *.
+        rewrite hold_eAND in *.
+        intro.
+        apply not_and_dec in H; auto with tauto.
+        destruct H.
+        rewrite <- hold_eNOT in H.
+        apply (IHf1 false env) in H.
+        simpl in H. rewrite hold_eNOT in H. tauto.
+        rewrite <- hold_eNOT in H.
+        apply (IHf2 false env) in H.
+        simpl in H. rewrite hold_eNOT in H. tauto.
+    -  destruct pol ; simpl in *; intros.
+      + rewrite hold_eOR in *.
+        destruct H as [H | H].
+        apply (IHf1 true env) in H.
+        tauto.
+        apply (IHf2 true env) in H.
+        tauto.
+      + rewrite hold_eNOT in *.
+        rewrite hold_eOR in *.
+        intro.
+        apply not_or_dec in H; auto.
+        destruct H as (H1 & H2).
+        rewrite <- hold_eNOT in *.
+        apply (IHf1 false env) in H1.
+        apply (IHf2 false env) in H2.
+        simpl in H1, H2.
+        rewrite hold_eNOT in *.
+        tauto.
+    - destruct pol ; simpl in *.
+      + intros.
+        apply (IHf false env) in H.
+        simpl in H. auto.
+      + intros.
+        repeat rewrite hold_eNOT in H.
+        apply not_not_dec in H; auto with tauto.
+        apply (IHf true env) in H.
+        repeat rewrite hold_eNOT. tauto.
+    - destruct pol ; simpl in *.
+      + intros.
+        rewrite hold_eIMPL in *.
+        intros.
+        apply impl_dec in H ; auto with tauto.
+        destruct H.
+        * rewrite <- hold_eNOT in H.
+          apply (IHf1 false env) in H.
+          simpl in H.
+          rewrite hold_eNOT in H. tauto.
+        * apply (IHf2 true env) in H ; auto.
+      + intros.
+        rewrite hold_eNOT in *.
+        rewrite hold_eIMPL in *.
+        intro.
+        apply impl_neg_dec in H; auto with tauto.
+        destruct H.
+        apply (IHf1 true env) in H.
+        rewrite <- hold_eNOT in H1.
+        apply (IHf2 false env) in H1.
+        simpl in H1.
+        rewrite hold_eNOT in H1.
+        tauto.
+    -
+      intros.
+      generalize (IHf1 true env).
+      generalize (IHf1 false env).
+      generalize (IHf2 true env).
+      generalize (IHf2 false env).
+      generalize (hold_forget_X_dec env f1 true).
+      generalize (hold_forget_X_dec env f1 false).
+      generalize (hold_forget_X_dec env f2 true).
+      generalize (hold_forget_X_dec env f2 false).
+      destruct pol ; simpl in *.
+      repeat rewrite hold_eAND in *;
+      repeat rewrite hold_eIFF in *;
+      repeat rewrite hold_eIMPL in *;
+      repeat rewrite hold_eNOT in *.
+      tauto.
+      repeat rewrite hold_eNOT in *.
+      repeat rewrite hold_eAND in *;
+      repeat rewrite hold_eIFF in *;
+      repeat rewrite hold_eIMPL in *;
+      tauto.
+    - simpl in IHf1.
+      destruct pol ; simpl; auto.
+  Qed.
+
+
   Lemma tauto_checker_sound : forall t  w, tauto_checker t w = true -> forall env, eval_f e_rtyp (eval env)  t.
   Proof.
     unfold tauto_checker.
     intros.
     change (eval_f e_rtyp (eval env) t) with (eval_f e_rtyp (eval env) (if true then t else TT isProp)).
-    apply (xcnf_correct t true).
-    eapply cnf_checker_sound ; eauto.
+    apply cnf_checker_sound with (env:=env) in H.
+    rewrite forget_X_same_cnf in H.
+    apply xcnf_correct in H.
+    simpl in *.
+    apply  (forget_X_weak  t true).
+    simpl.
+    generalize (hold_forget_X_dec env t true).
+    simpl. tauto.
   Qed.
 
   Definition eval_bf {A : Type} (ea : forall (k: kind), A -> rtyp k) (k: kind) (f: BFormula A k) := eval_f e_rtyp ea f.

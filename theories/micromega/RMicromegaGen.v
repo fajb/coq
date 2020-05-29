@@ -83,7 +83,7 @@ Definition Rnegate_kind (A: Type) (k:kind) :=
 
 
 Definition RTautoChecker  (f : BFormula (Formula Q) Tauto.isProp) (w: list QWitness)  : bool :=
-  @tauto_checker (Formula Q) (NFormula Q) unit
+  @itauto_checker (Formula Q) (NFormula Q) unit
   qunsat qdeduce
   (Rnormalise_kind unit)
   (Rnegate_kind unit) QWitness (fun cl => QWeakChecker (List.map fst cl)) f w.
@@ -92,8 +92,7 @@ Definition RTautoChecker  (f : BFormula (Formula Q) Tauto.isProp) (w: list QWitn
   Proof.
     intros f w.
     unfold RTautoChecker.
-    apply Tauto.tauto_checker_sound  with (eval:= Reval_formula_rtyp) (eval':= Reval_nformula).
-    - intros. apply (eval_nformula_dec (Rsor LRA) Q2R).
+    apply Tauto.itauto_checker_sound  with (eval:= Reval_formula_rtyp) (eval':= Reval_nformula).
     - intros until env.
       unfold eval_nformula. unfold RingMicromega.eval_nformula.
       destruct t.

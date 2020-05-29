@@ -481,6 +481,30 @@ Definition Qeval_nformula :=
   eval_nformula 0 Rplus Rmult  (@eq R) Rle Rlt Q2R.
 
 
+Lemma QReval_formula_dec :
+  forall (env0 : PolEnv R) (d : Formula Q),
+  QReval_formula env0 Tauto.isProp d \/ ~ QReval_formula env0 Tauto.isProp d.
+Proof.
+  destruct d; simpl.
+  generalize (QReval_expr env0 Flhs) as x.
+  generalize (QReval_expr env0 Frhs) as y.
+  destruct Fop ; simpl; intros.
+  - apply Req_dec.
+  - generalize (Req_dec x y). tauto.
+  - destruct (Rle_or_lt x y).
+    tauto.
+    right. apply Rlt_not_le ; auto.
+  - destruct (Rge_or_gt x y).
+    tauto.
+    right. apply Rgt_not_ge ; auto.
+  - destruct (Rlt_or_le x y).
+    tauto.
+    right. apply Rle_not_lt ; auto.
+  - destruct (Rgt_or_ge x y).
+    tauto.
+    right. apply Rge_not_gt ; auto.
+Qed.
+
 Lemma Reval_nformula_dec : forall env d, (Qeval_nformula env d) \/ ~ (Qeval_nformula env d).
 Proof.
   exact (fun env d =>eval_nformula_dec Rsor Q2R env d).
@@ -553,8 +577,6 @@ Proof.
     rewrite Reval_formula_compat.
     tauto.
     intro. rewrite Q_of_RcstR. reflexivity.
-  -
-  apply Reval_nformula_dec.
   - destruct t.
   apply (check_inconsistent_sound Rsor QSORaddon) ; auto.
   - unfold rdeduce.
@@ -578,6 +600,7 @@ Proof.
     rewrite make_impl_map with (eval := Qeval_nformula env0).
     eapply RWeakChecker_sound; eauto.
     tauto.
+  - apply QReval_formula_dec.
 Qed.
 
 

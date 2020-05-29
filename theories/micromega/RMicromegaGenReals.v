@@ -13,8 +13,15 @@ Open Scope R_scope.
 Goal forall (x y:R), x + y = y + x.
 Proof.
   intros.
-  lra. (* redefined by LraGen *)
+  Fail lra.
+Abort.
+
+Goal forall (x:R), ~ x < x.
+Proof.
+  intro.
+  lra.
 Qed.
+
 
 Goal forall x, 2 * x = x + x.
 Proof.
@@ -22,7 +29,14 @@ Proof.
   Fail lra. (* IZR 2 is parsed as a variable *)
 Abort.
 
-Goal forall x, Q2R (2#1) * x = x + x.
+Goal forall x, (Q2R (2#1) * x = x + x).
+Proof.
+  intros.
+  Fail lra.
+Abort.
+
+
+Goal forall x, ~ ~ (Q2R (2#1) * x = x + x).
 Proof.
   intros.
   lra.
@@ -34,8 +48,13 @@ Proof.
   Fail lra. (* >= is not a known operator only <= and < *)
 Abort.
 
+
+
 Goal forall x, Q2R (2#1) <= x  -> Q2R (1#1) <= x.
 Proof.
   intros.
+  Fail lra.
+  apply RIneq.Rnot_lt_le.
+  unfold not.
   lra.
 Qed.

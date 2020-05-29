@@ -198,10 +198,32 @@ match o with
 | NonStrict => fun x : Q => 0 <= x
 end.
 
-
-Lemma Qeval_nformula_dec : forall env d, (Qeval_nformula env d) \/ ~ (Qeval_nformula env d).
+Lemma Qeval_formula_dec :
+  forall (env : PolEnv Q) (d : Formula Q),
+  Qeval_formula env Tauto.isProp d \/ ~ Qeval_formula env Tauto.isProp d.
 Proof.
-  exact (fun env d =>eval_nformula_dec Qsor (fun x => x)  env d).
+  unfold Qeval_formula.
+  intros.
+  simpl. destruct d.
+  generalize (Qeval_expr env Flhs) as x.
+  generalize (Qeval_expr env Frhs) as y.
+  destruct Fop ; simpl; intros.
+  - destruct (Qeq_dec x y); tauto.
+  - destruct (Qeq_dec x y); tauto.
+  - destruct (Qlt_le_dec y x).
+    right. apply Qlt_not_le.  auto.
+    tauto.
+  - destruct (Qlt_le_dec x y).
+    right. apply Qlt_not_le.  auto.
+    tauto.
+  - destruct (Qlt_le_dec x y).
+    tauto.
+    right.
+    apply Qle_not_lt.  auto.
+  - destruct (Qlt_le_dec y x).
+    tauto.
+    right.
+    apply Qle_not_lt.  auto.
 Qed.
 
 Definition QWitness := Psatz Q.
@@ -238,8 +260,8 @@ Definition qdeduce := nformula_plus_nformula 0 Qplus Qeq_bool.
 Definition normQ  := norm 0 1 Qplus Qmult Qminus Qopp Qeq_bool.
 Declare Equivalent Keys normQ RingMicromega.norm.
 
-Definition cnfQ (Annot:Type) (TX: Tauto.kind -> Type)  (AF: Type) (k: Tauto.kind) (f: TFormula (Formula Q) Annot TX AF k) :=
-  rxcnf qunsat qdeduce (Qnormalise Annot) (Qnegate Annot) true f.
+Definition cnfQ (Annot:Type) (TX: Tauto.kind -> Type)  (AF: Type) (k: Tauto.kind) (b:bool) (f: TFormula (Formula Q) Annot TX AF k) :=
+  rxcnf qunsat qdeduce (Qnormalise Annot) (Qnegate Annot) b f.
 
 Definition QTautoChecker  (f : BFormula (Formula Q) Tauto.isProp) (w: list QWitness)  : bool :=
   @tauto_checker (Formula Q) (NFormula Q) unit
@@ -254,7 +276,6 @@ Proof.
   intros f w.
   unfold QTautoChecker.
   apply tauto_checker_sound  with (eval:= Qeval_formula) (eval':= Qeval_nformula).
-  - apply Qeval_nformula_dec.
   - intros until env.
     unfold eval_nformula. unfold RingMicromega.eval_nformula.
     destruct t.
@@ -271,6 +292,7 @@ Proof.
     rewrite make_impl_map with (eval := Qeval_nformula env).
     eapply QWeakChecker_sound; eauto.
     tauto.
+  - apply Qeval_formula_dec.
 Qed.
 
 (* Local Variables: *)
