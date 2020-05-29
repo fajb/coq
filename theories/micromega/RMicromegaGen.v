@@ -14,7 +14,7 @@
 (*                                                                      *)
 (************************************************************************)
 
-Require Import OrderedRing.
+Require Import List OrderedRing.
 Require Import RingMicromega.
 Require Import Refl.
 Require Import QArith.
@@ -24,6 +24,7 @@ Require Import DeclConstant.
 Require Import Ztac.
 Require Import QMicromega.
 Require Import VarMap.
+Require Import micromega.Tauto.
 
 Require Setoid.
 
@@ -61,30 +62,63 @@ Section Make.
 
   Definition Reval_nformula := eval_nformula rO rplus rtimes req rle rlt  Q2R.
 
-  Lemma RTautoChecker_sound : forall f w, QTautoChecker f w = true -> forall env, Tauto.eval_bf  (Reval_formula env)  f.
+
+  Definition Reval_formula_rtyp (env: PolEnv R) (k:Tauto.kind) : Formula Q -> Tauto.rtyp k :=
+    match k as k' return Formula Q -> Tauto.rtyp k' with
+    | Tauto.isProp => Reval_formula env
+    | _      => fun f  => true (* this is actually dead code *)
+    end.
+
+Definition Rnormalise_kind (A: Type) (k:kind) :=
+  match k with
+  | Tauto.isProp => Qnormalise A k
+  | isBool => fun f _  => nil::nil
+  end.
+
+Definition Rnegate_kind (A: Type) (k:kind) :=
+  match k with
+  | Tauto.isProp => Qnegate A k
+  | isBool => fun f _  => nil::nil
+  end.
+
+
+Definition RTautoChecker  (f : BFormula (Formula Q) Tauto.isProp) (w: list QWitness)  : bool :=
+  @tauto_checker (Formula Q) (NFormula Q) unit
+  qunsat qdeduce
+  (Rnormalise_kind unit)
+  (Rnegate_kind unit) QWitness (fun cl => QWeakChecker (List.map fst cl)) f w.
+
+  Lemma RTautoChecker_sound : forall f w, RTautoChecker f w = true -> forall env, Tauto.eval_bf  (Reval_formula_rtyp env)  f.
   Proof.
-    intros f w TC env.
-    apply Tauto.tauto_checker_sound with (eval:=Reval_formula) (eval':=    Reval_nformula) (env := env) in TC; auto.
+    intros f w.
+    unfold RTautoChecker.
+    apply Tauto.tauto_checker_sound  with (eval:= Reval_formula_rtyp) (eval':= Reval_nformula).
     - intros. apply (eval_nformula_dec (Rsor LRA) Q2R).
-    - destruct t. unfold Reval_nformula, eval_nformula.
-      intros qunsat env0.
+    - intros until env.
+      unfold eval_nformula. unfold RingMicromega.eval_nformula.
+      destruct t.
       apply (check_inconsistent_sound (Rsor LRA) (Rsoraddon LRA)) ; auto.
-  - intros. revert H.
-    eapply (nformula_plus_nformula_correct (Rsor LRA) (Rsoraddon LRA)); eauto.
-  - now apply (cnf_normalise_correct (Rsor LRA) (Rsoraddon LRA)).
-  - intros. now eapply (cnf_negate_correct (Rsor LRA) (Rsoraddon LRA)); eauto.
-  - intros l cm H env0.
-    unfold Reval_nformula.
-    unfold  QWeakChecker in H.
-    apply (checker_nf_sound (Rsor LRA) (Rsoraddon LRA) (List.map fst l) cm) with (env:= env0) in H.
-    rewrite make_impl_map with (eval := Reval_nformula env0);auto.
-    unfold Reval_nformula, Tauto.eval_tt; tauto.
+    - unfold qdeduce. intros. revert H. apply (nformula_plus_nformula_correct (Rsor LRA) (Rsoraddon LRA));auto.
+    - intros.
+      destruct k ; simpl; auto.
+      revert H.
+      now apply (cnf_normalise_correct (Rsor LRA) (Rsoraddon LRA)).
+    - intros. rewrite Tauto.hold_eNOT. destruct k ; simpl ; auto.
+      now eapply (cnf_negate_correct (Rsor LRA) (Rsoraddon LRA));eauto.
+      unfold eval_cnf in H. simpl in H. unfold eval_clause in H. simpl in H.
+      tauto.
+    - intros l cm H env0.
+      unfold Reval_nformula.
+      unfold  QWeakChecker in H.
+      apply (checker_nf_sound (Rsor LRA) (Rsoraddon LRA) (List.map fst l) cm) with (env:= env0) in H.
+      rewrite make_impl_map with (eval := Reval_nformula env0);auto.
+      unfold Reval_nformula, Tauto.eval_tt; tauto.
   Qed.
 
 End Make.
 
 Register RTautoChecker_sound   as lra.thm.
-Register QTautoChecker         as lra.checker.
+Register RTautoChecker         as lra.checker.
 Register VarMap.find           as lra.find.
 
 

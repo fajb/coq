@@ -227,9 +227,9 @@ Qed.
 
 Require Import Coq.micromega.Tauto.
 
-Definition Qnormalise := @cnf_normalise Q 0 1 Qplus Qmult Qminus Qopp Qeq_bool Qle_bool.
+Definition Qnormalise (A:Type) (k:kind) := @cnf_normalise Q 0 1 Qplus Qmult Qminus Qopp Qeq_bool Qle_bool A.
 
-Definition Qnegate := @cnf_negate Q 0 1 Qplus Qmult Qminus Qopp Qeq_bool Qle_bool.
+Definition Qnegate (A:Type) (k:kind) := @cnf_negate Q 0 1 Qplus Qmult Qminus Qopp Qeq_bool Qle_bool A.
 
 Definition qunsat := check_inconsistent 0 Qeq_bool Qle_bool.
 

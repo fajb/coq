@@ -479,12 +479,12 @@ Proof.
       tauto.
 Qed.
 
-Definition normalise {T : Type} (t:Formula Z) (tg:T) : cnf (NFormula Z) T :=
+Definition normalise {T : Type} (k:kind) (t:Formula Z) (tg:T) : cnf (NFormula Z) T :=
   let f := xnnormalise t in
   if Zunsat f then cnf_ff _ _
   else cnf_of_list tg (xnormalise f).
 
-Lemma normalise_correct : forall (T: Type) env t (tg:T), eval_cnf eval_nformula env (normalise t tg) <-> Zeval_formula env Tauto.isProp t.
+Lemma normalise_correct : forall (T: Type) env t (tg:T), eval_cnf eval_nformula env (normalise Tauto.isProp t  tg) <-> Zeval_formula env Tauto.isProp t.
 Proof.
   intros.
   rewrite <- xnnormalise_correct.
@@ -508,7 +508,7 @@ Definition xnegate (f:NFormula Z) : list (NFormula Z)  :=
       | Strict    => (psub e (Pc 1),NonStrict)::nil
     end.
 
-Definition negate {T : Type} (t:Formula Z) (tg:T) : cnf (NFormula Z) T :=
+Definition negate {T : Type} (k:kind) (t:Formula Z) (tg:T) : cnf (NFormula Z) T :=
   let f := xnnormalise t in
   if Zunsat f then cnf_tt _ _
   else cnf_of_list tg (xnegate f).
@@ -528,7 +528,7 @@ Proof.
   - tauto.
 Qed.
 
-Lemma negate_correct : forall T env t (tg:T), eval_cnf eval_nformula env (negate t tg) <-> ~ Zeval_formula env Tauto.isProp t.
+Lemma negate_correct : forall T env t (tg:T), eval_cnf eval_nformula env (negate Tauto.isProp t tg) <-> ~ Zeval_formula env Tauto.isProp t.
 Proof.
   intros.
   rewrite <- xnnormalise_correct.
@@ -1739,10 +1739,16 @@ Proof.
      apply (nformula_plus_nformula_correct Zsor ZSORaddon); auto.
   -
     intros.
+    assert (normalise k t tg = normalise Tauto.isProp t tg).
+    { destruct k ; auto. }
+    rewrite H0 in H.
     rewrite normalise_correct  in H.
     rewrite Zeval_formula_compat; auto.
   -
     intros.
+    assert (negate k t tg = negate Tauto.isProp t tg).
+    { destruct k ; auto. }
+    rewrite H0 in H.
     rewrite negate_correct in H ; auto.
     rewrite Tauto.hold_eNOT.
     rewrite Zeval_formula_compat; auto.

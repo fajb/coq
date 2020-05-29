@@ -2476,6 +2476,7 @@ type lra_decl =
   ; rO : EConstr.t
   ; rel_table : (EConstr.t Lazy.t * Mc.op2) list
   ; rop_table : (EConstr.t Lazy.t * Mc.q op) list
+  ; req : EConstr.t
   ; q2r : EConstr.t
   ; thm : EConstr.t (* redundant with rop_table *)
   ; add : EConstr.t
@@ -2512,6 +2513,7 @@ let register_constr env evd c =
     let lra =
       { r
       ; rO
+      ; req
       ; rel_table =
           [(lazy req, Mc.OpEq); (lazy rle, Mc.OpLe); (lazy rlt, Mc.OpLt)]
       ; rop_table =
@@ -2570,15 +2572,6 @@ let register_lra c =
   let _ = Lib.add_anonymous_leaf (register_obj (EConstr.to_constr evd c)) in
   ()
 
-let get_binop op args =
-  let len = Array.length args in
-  if len = 2 then (op, args.(0), args.(1))
-  else if len < 2 then raise ParseError
-  else
-    ( EConstr.mkApp (op, Array.sub args 0 (len - 2))
-    , args.(len - 2)
-    , args.(len - 1) )
-
 let eq_refl = lazy (constr_of_ref "core.eq.refl")
 let bool = lazy (constr_of_ref "core.bool.type")
 
@@ -2621,11 +2614,11 @@ let lra_gen tac =
   | Some d ->
     let rop_table = d.rop_table in
     let rel_table = d.rel_table in
-    let parse_rel gl (op, args) =
-      let sigma = gl.sigma in
-      let op, a1, a2 = get_binop op args in
-      (assoc_const sigma op rel_table, a1, a2)
+    let has_equality =
+      EConstr.eq_constr Evd.empty d.req
+        (EConstr.mkApp (Lazy.force coq_eq, [|d.r|]))
     in
+    let parse_rel = parse_operator rel_table [] has_equality (lazy d.r) in
     let rconstant gl term =
       let sigma = gl.sigma in
       match EConstr.kind sigma term with
@@ -2656,7 +2649,8 @@ let lra_gen tac =
         ; dump_mul = d.mul
         ; dump_pow = d.pow
         ; dump_pow_arg = (fun n -> raise ParseError)
-        ; dump_op = List.map (fun (x, y) -> (y, Lazy.force x)) d.rel_table }
+        ; dump_op_prop = List.map (fun (x, y) -> (y, Lazy.force x)) d.rel_table
+        ; dump_op_bool = [] }
     in
     let parse_rarith = parse_arith parse_rel parse_rexpr in
     micromega_gen parse_rarith

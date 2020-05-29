@@ -338,8 +338,8 @@ Section S.
   Definition clause := list  (Term' * Annot).
   Definition cnf := list clause.
 
-  Variable normalise : Term -> Annot -> cnf.
-  Variable negate : Term -> Annot -> cnf.
+  Variable normalise : kind -> Term -> Annot -> cnf.
+  Variable negate : kind -> Term -> Annot -> cnf.
 
 
   Definition cnf_tt : cnf := @nil clause.
@@ -479,7 +479,7 @@ Section S.
     | TT _ => if pol then cnf_tt else cnf_ff
     | FF _ => if pol then cnf_ff else cnf_tt
     | X _ p => if pol then cnf_ff else cnf_ff (* This is not complete - cannot negate any proposition *)
-    | A _ x t => if pol then normalise x  t else negate x  t
+    | A _ x t => if pol then normalise k x  t else negate k x  t
     | NOT e  => xcnf (negb pol) e
     | AND e1 e2 => mk_and xcnf pol e1 e2
     | OR e1 e2  => mk_or xcnf pol e1 e2
@@ -636,7 +636,7 @@ Section S.
       | TT _ => if polarity then (cnf_tt,nil) else (cnf_ff,nil)
       | FF _  => if polarity then (cnf_ff,nil) else (cnf_tt,nil)
       | X b p => if polarity then (cnf_ff,nil) else (cnf_ff,nil)
-      | A _ x t  => ratom (if polarity then normalise x t else negate x t) t
+      | A _ x t  => ratom (if polarity then normalise k x t else negate k x t) t
       | NOT e  => rxcnf (negb polarity) e
       | AND e1 e2 => rxcnf_and rxcnf polarity e1 e2
       | OR e1 e2  => rxcnf_or rxcnf polarity e1 e2
@@ -1682,9 +1682,9 @@ Section S.
 
   Variable eval  : Env -> forall (k: kind), Term -> rtyp k.
 
-  Variable normalise_correct : forall env b t tg, eval_cnf  env (normalise t tg) ->  hold b (eval env b t).
+  Variable normalise_correct : forall env k t tg, eval_cnf  env (normalise k t tg) ->  hold k (eval env k t).
 
-  Variable negate_correct : forall env b t tg, eval_cnf env (negate t tg) -> hold b (eNOT b (eval env b t)).
+  Variable negate_correct : forall env k t tg, eval_cnf env (negate k t tg) -> hold k (eNOT k (eval env k t)).
 
   Definition e_rtyp (k: kind) (x : rtyp k) : rtyp k := x.
 

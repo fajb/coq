@@ -395,7 +395,6 @@ Definition Reval_pop2 (o:Op2) : R -> R -> Prop :=
 Definition sumboolb {A B : Prop} (x : @sumbool A B) : bool :=
   if x then true else false.
 
-
 Definition Reval_bop2 (o : Op2) : R -> R -> bool :=
   match o with
   | OpEq  => fun x y => sumboolb (Req_EM_T x y)
@@ -508,7 +507,21 @@ Qed.
 Require Import Coq.micromega.Tauto.
 
 Definition Rnormalise := @cnf_normalise Q 0%Q 1%Q Qplus Qmult Qminus Qopp Qeq_bool Qle_bool.
+
+Definition Rnormalise_kind (A: Type) (k:kind) :=
+  match k with
+  | isProp => Rnormalise A
+  | isBool => fun f _ => nil::nil
+  end.
+
 Definition Rnegate := @cnf_negate Q 0%Q 1%Q Qplus Qmult Qminus Qopp Qeq_bool Qle_bool.
+
+Definition Rnegate_kind (A: Type) (k:kind) :=
+  match k with
+  | isProp => Rnegate A
+  | isBool => fun f _ => nil::nil
+  end.
+
 
 Definition runsat := check_inconsistent 0%Q Qeq_bool Qle_bool.
 
@@ -517,7 +530,7 @@ Definition rdeduce := nformula_plus_nformula 0%Q Qplus Qeq_bool.
 Definition RTautoChecker (f : BFormula (Formula Rcst) Tauto.isProp) (w: list RWitness)  : bool :=
   @tauto_checker (Formula Q) (NFormula Q)
   unit runsat rdeduce
-  (Rnormalise unit) (Rnegate unit)
+  (Rnormalise_kind unit) (Rnegate_kind unit)
   RWitness (fun cl => RWeakChecker (List.map fst cl)) (map_bformula (map_Formula Q_of_Rcst)  f) w.
 
 Lemma RTautoChecker_sound : forall f w, RTautoChecker f w = true -> forall env, eval_bf  (Reval_formula env)  f.
@@ -550,9 +563,15 @@ Proof.
   -
     intros.
     rewrite QReval_formula_compat.
+    destruct k ; simpl in H.
     eapply (cnf_normalise_correct Rsor QSORaddon) ; eauto.
+    unfold eval_cnf in H. simpl in H. unfold eval_clause in H.
+    simpl in H. tauto.
   - intros. rewrite Tauto.hold_eNOT. rewrite QReval_formula_compat.
+    destruct k ; simpl in H.
     now eapply (cnf_negate_correct Rsor QSORaddon); eauto.
+    unfold eval_cnf in H. simpl in H. unfold eval_clause in H.
+    simpl in H. tauto.
   - intros t w0.
     unfold eval_tt.
     intros.
