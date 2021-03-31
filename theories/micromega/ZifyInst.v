@@ -524,3 +524,7 @@ Instance SatPowPos : Saturate Z.pow :=
     SatOk := pow_pos_strict
   |}.
 Add Zify Saturate SatPowPos.
+
+(** Proof of positivity of constants *)
+Register Zbool.Zlt_cases as ZifyClasses.Zlt_cases.
+Register Zbool.Zle_cases as ZifyClasses.Zle_cases.

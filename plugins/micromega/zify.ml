@@ -46,7 +46,23 @@ let op_iff_morph = lazy (zify "iff_morph")
 let op_not = lazy (zify "not")
 let op_not_morph = lazy (zify "not_morph")
 let op_True = lazy (zify "True")
+let op_I = lazy (zify "I")
 let whd = Reductionops.clos_whd_flags CClosure.all
+
+let constr_of_ref str =
+  EConstr.of_constr (UnivGen.constr_of_monomorphic_global (Coqlib.lib_ref str))
+
+(* Z *)
+let coq_xH = lazy (constr_of_ref "num.pos.xH")
+let coq_xO = lazy (constr_of_ref "num.pos.xO")
+let coq_xI = lazy (constr_of_ref "num.pos.xI")
+let coq_ZERO = lazy (constr_of_ref "num.Z.Z0")
+let coq_POS = lazy (constr_of_ref "num.Z.Zpos")
+let coq_NEG = lazy (constr_of_ref "num.Z.Zneg")
+let coq_Zle = lazy (constr_of_ref "num.Z.le")
+let coq_Zlt = lazy (constr_of_ref "num.Z.lt")
+let coq_Zlt_cases = lazy (zify "Zlt_cases")
+let coq_Zle_cases = lazy (zify "Zle_cases")
 
 (** [unsafe_to_constr c] returns a [Constr.t] without considering an evar_map.
     This is useful for calling Constr.hash *)
@@ -1511,8 +1527,67 @@ let spec_of_hyps =
 let iter_specs = spec_of_hyps
 
 let find_hyp evd t l =
-  try Some (fst (List.find (fun (h, t') -> EConstr.eq_constr evd t t') l))
+  try
+    Some
+      (EConstr.mkVar
+         (fst (List.find (fun (h, t') -> EConstr.eq_constr evd t t') l)))
   with Not_found -> None
+
+let rec is_positive evd p =
+  match EConstr.kind evd p with
+  | App (c, a) when Array.length a = 1 ->
+    ( EConstr.eq_constr evd (Lazy.force coq_xI) c
+    || EConstr.eq_constr evd (Lazy.force coq_xO) c )
+    && is_positive evd a.(0)
+  | Construct _ -> EConstr.eq_constr evd (Lazy.force coq_xH) p
+  | _ -> false
+
+type z = ZERO | POS | NEG
+
+let z_kind evd z =
+  match EConstr.kind evd z with
+  | App (c, a) when Array.length a = 1 && is_positive evd a.(0) ->
+    if EConstr.eq_constr evd (Lazy.force coq_NEG) c then Some NEG
+    else if EConstr.eq_constr evd (Lazy.force coq_POS) c then Some POS
+    else None
+  | Construct _ when EConstr.eq_constr evd (Lazy.force coq_ZERO) z -> Some ZERO
+  | _ -> None
+
+let is_le_0 z = match z with ZERO | POS -> true | NEG -> false
+let is_lt_0 z = match z with POS -> true | _ -> false
+
+let positivity_proof evd t =
+  match EConstr.kind evd t with
+  | App (c, a)
+    when Array.length a = 2 && EConstr.eq_constr evd (Lazy.force coq_ZERO) a.(0)
+    -> (
+    match z_kind evd a.(1) with
+    | None -> None
+    | Some z ->
+      if EConstr.eq_constr evd (Lazy.force coq_Zle) c then
+        if is_le_0 z then
+          Some (EConstr.mkApp (Lazy.force coq_Zle_cases, [|a.(0); a.(1)|]))
+        else None
+      else if EConstr.eq_constr evd (Lazy.force coq_Zlt) c then
+        if is_lt_0 z then
+          Some (EConstr.mkApp (Lazy.force coq_Zlt_cases, [|a.(0); a.(1)|]))
+        else None
+      else None )
+  | _ -> None
+
+(** [find_proof evd t l] returns a proof of [t] that can be
+    - one of the hypotheses in l
+    - I if t = True
+    - Zle_cases 0 x if t= 0 <= x for (x:Z) a positive constant
+    - Zlt_cases 0 x if t= 0 < x for (x:Z) a (strict) positive constant
+ *)
+
+let find_proof evd t l =
+  if EConstr.eq_constr evd t (Lazy.force op_True) then Some (Lazy.force op_I)
+  else
+    match positivity_proof evd t with
+    | None -> find_hyp evd t l
+    | Some prf -> Some prf
 
 let sat_constr c d =
   Proofview.Goal.enter (fun gl ->
@@ -1530,7 +1605,7 @@ let sat_constr c d =
             Tacred.cbv_beta env evd
               (EConstr.mkApp (d.ESatT.parg2, [|args.(1)|]))
           in
-          match (find_hyp evd h1 hyps, find_hyp evd h2 hyps) with
+          match (find_proof evd h1 hyps, find_proof evd h2 hyps) with
           | Some h1, Some h2 ->
             let n =
               Tactics.fresh_id_in_env Id.Set.empty
@@ -1538,9 +1613,7 @@ let sat_constr c d =
                 env
             in
             let trm =
-              EConstr.mkApp
-                ( d.ESatT.satOK
-                , [|args.(0); args.(1); EConstr.mkVar h1; EConstr.mkVar h2|] )
+              EConstr.mkApp (d.ESatT.satOK, [|args.(0); args.(1); h1; h2|])
             in
             Tactics.pose_proof (Names.Name n) trm
           | _, _ -> Tacticals.New.tclIDTAC
